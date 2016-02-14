@@ -10,26 +10,28 @@ function testb()
 end
 
 function testc(arg)
+	--single() check lock, is locked quit
 	--arg:{name="test1", sessionId=123, group="qa1", target={nick1,nick2}}
 	--remote_cmd("ls -l", function(status, recv)
 	--	print(status, recv)
 	--end)
-	--server_upload("/tmp/a.txt", "/home/pangu/a.txt", callback)
-	--server_download("/home/pangu/a.txt", "/tmp/a.txt", callback)
+	--server_upload("/tmp/a.txt", "/home/pangu/a.txt")
+	--server_download("/home/pangu/a.txt", "/tmp/a.txt")
 	--
-	--local_server_download("/tmp/a.txt", callback)
-	--local_remote_download("/tmp/a.txt", targetNick, callback)
-	--local_remote_upload("/tmp/a.txt", targetNick, callback) arg1 is target file.this will choose a file from broswer
-	--local_server_upload("/tmp/a.txt", targetNick, callback)
-	--local_getinput("ok?", callback)
-	--local_confirm("ok?", callback)
+	--local_server_download("/tmp/a.txt")
+	--local_remote_download("/tmp/a.txt", targetNick)
+	--local_remote_upload("/tmp/a.txt", targetNick) arg1 is target file.this will choose a file from broswer
+	--local_server_upload("/tmp/a.txt", targetNick)
+	--local_getinput("ok?")
+	--local_confirm("ok?")
 	--local_output("ssss")
 	--
 	--global_setmap(key, value)
 	--global_setmap_ifeq(key, value, old)
 	--global_getmap(key)
 	--
-	--
-	--session_defer_func(callback)
+	--dieafter(10)
+	--try_dialtimeout(ip+port, 10)
+	--sleep(10)
 end
 
