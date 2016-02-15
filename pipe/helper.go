@@ -175,11 +175,9 @@ func NewInnerServerWithRouteAndQuit(addr string, c chan *HelperInfo, route *rout
 
 type InnerClient struct {
 	conn net.Conn
-	tbl map[byte]func()
 }
 
 func NewInnerClient(addr string, c chan *HelperInfo) *InnerClient {
-	client := &InnerClient{}
 	conn, err := net.DialTimeout("tcp", addr, 30*time.Second)
 	if err != nil {
 		log.Println(err.Error())
@@ -208,9 +206,13 @@ func NewInnerClient(addr string, c chan *HelperInfo) *InnerClient {
 		}
 		c <- &HelperInfo{conn, Shutdown, []byte{}}
 	}()
+	client := &InnerClient{}
 	client.conn = conn
-	client.tbl = make(map[byte]func())
 	return client
+}
+
+func (c *InnerClient) Send(cmd Cmd, info interface{}) (int, error) {
+        return Send(c.conn, cmd, info)
 }
 
 func NewAdminHanderTbl() map[string]cmdHandler  {

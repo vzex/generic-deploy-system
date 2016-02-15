@@ -1,4 +1,5 @@
 package pipe
+import "time"
 
 const (
 	//server spec cmd
@@ -6,14 +7,14 @@ const (
 	Shutdown //自身服务关闭
 	Enter   //远程连入
 	Leave   //远程连出
+        Request
+        Response
 )
 
 type Action byte
 
-//server common cmd
-type CommonErrMsgCmd struct {
+type RequestCmd struct {
 	Id uint64
-	AccountName string
-	Msg string
-	Action Action
+	Cmd string
+	OverTime time.Time
 }
