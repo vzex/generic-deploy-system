@@ -57,6 +57,8 @@
                         }
 
                         function OnRecv(data) {
+				$.alert("recv "+ data);
+				return;
                                 var arr= Decode(data)
                                 var head = arr[0];
                                 var msg= arr[1];
@@ -74,6 +76,10 @@
                                 conn.onmessage = function(evt) {
                                         OnRecv(evt.data);
                                 }   
+				conn.onopen = function() {
+					//conn.send("hehehe");
+				}
+
                                 } else {
                                 $.alert("<div><b>Your browser does not support WebSockets.</b></div>");
                         }  
