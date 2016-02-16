@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+        <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <meta name="description" content="">
+                <title>gds</title>
+                <link href="css/sui.min.css" rel="stylesheet">
+                <script type="text/javascript" src="js/jquery-1.10.2.min.js"></script>
+                <script type="text/javascript" src="js/sui.min.js"></script>
+        </head>
+        <body>
+                <div class="sui-layout">
+                        <div class="sidebar">
+                                <ul class="sui-nav nav-tabs nav-large tab-vertical">
+                                        <li><a>语文</a></li>
+                                        <li class="active"><a href="#index" data-toggle="tab">数学</a></li>
+                                        <li><a href="#profile" data-toggle="tab">英语</a></li>
+                                </ul>
+                        </div>
+                        <div class="content">
+                                <div class="tab-content tab-wraped">
+                                        <div id="index" class="tab-pane active">
+                                                <p>qui irure terry richardson ex squid. Aliquip placeat salvia cillum iphone. Seitan aliquip quis cardigan american apparel, butcher voluptate nisi qui.</p>
+                                        </div>
+                                        <div id="profile" class="tab-pane">
+                                                <p>Art party scenester stumptown, tumblr butcher vero sint qui sapiente accusamus tattooed echo park</p>
+                                        </div>
+                                        <div id="about" class="tab-pane">
+                                                <p>Scenester cred you probably haven't heard of them, vinyl craft beer blog stumptown. Pitchfork sustainable tofu synth chambray yr.</p>
+                                        </div>
+                                        <div id="help" class="tab-pane">
+                                                <p>help!!!help!!!help!!!help!!!help!!!help!!!help!!!help!!!help!!!help!!!help!!!</p>
+                                        </div>
+                                </div>
+                        </div>
+                </div>
+                <script>
+                        function Decode(content) {
+                                var vars = content.split(":");
+                                var head, msg;
+                                if (vars.length > 0) {
+                                        head = vars[0];
+                                }
+                                if (vars.length > 1) {
+                                        msg = "";
+                                        for(var i=1;i<vars.length;i++) {
+                                                if(i==1) {
+                                                        msg=vars[i];
+                                                }
+                                                else {
+                                                        msg=msg+":"+vars[i];
+                                                }
+                                        }
+                                }
+                                return [head, msg];
+                        }
+
+                        function OnRecv(data) {
+                                var arr= Decode(data)
+                                var head = arr[0];
+                                var msg= arr[1];
+                                switch(head){
+                                        case "needinit":
+                                }
+                        }
+                        if (window["WebSocket"]) {
+                                conn = new WebSocket("ws://{{.}}/ws");
+                                conn.onclose = function() {
+                                }
+                                conn.onerror = function(ev) {
+                                        $.alert("connect error");
+                                }
+                                conn.onmessage = function(evt) {
+                                        OnRecv(evt.data);
+                                }   
+                                } else {
+                                $.alert("<div><b>Your browser does not support WebSockets.</b></div>");
+                        }  
+                </script>
+        </body>
+</html>
