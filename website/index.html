@@ -36,38 +36,90 @@
                         </div>
                 </div>
                 <script>
+                        var recvData = new ArrayBuffer(0);
                         function Decode(content) {
-                                var vars = content.split(":");
-                                var head, msg;
-                                if (vars.length > 0) {
-                                        head = vars[0];
+                                if (content==null) {
+                                        return [];
                                 }
-                                if (vars.length > 1) {
-                                        msg = "";
-                                        for(var i=1;i<vars.length;i++) {
-                                                if(i==1) {
-                                                        msg=vars[i];
-                                                }
-                                                else {
-                                                        msg=msg+":"+vars[i];
-                                                }
-                                        }
+                                var _content = content;
+                                if (recvData.byteLength > 0) {
+                                        _content = new ArrayBuffer(recvData.byteLength+content.byteLength);
+                                        var i = 0;
+                                        for (var n = 0; n < recvData.byteLength; n++) {
+                                                  _content[i] = recvData[n];
+                                                  i++;
+                                          }
+                                        for (var n = 0; n < content.byteLength; n++) {
+                                                  _content[i] = content[n];
+                                                  i++;
+                                          }
                                 }
+                                var view = new Uint8Array(_content);
+                                var l1 = view[0] + (view[1] >> 8);
+                                var l2 = view[2] + (view[3] >> 8) + (view[4] >> 16) + (view[5] >> 24);
+                                var l = l1 + l2 + 6;
+                                //console.log(l1+"s"+l2);
+                                if (_content.length < l) {
+                                        return [];
+                                }
+                                var head =String.fromCharCode.apply(null, new Uint8Array(_content.slice(6, 6+l1)));
+                                var msg = String.fromCharCode.apply(null, new Uint8Array(_content.slice(6+l1, 6+l1+l2)));
+                                recvData = _content.slice(6+l1+l2);
+                                //console.log((l1+l2+6) +"tail:"+recvData.byteLength);
                                 return [head, msg];
                         }
 
                         function OnRecv(data) {
-				$.alert("recv "+ data);
-				return;
-                                var arr= Decode(data)
-                                var head = arr[0];
-                                var msg= arr[1];
-                                switch(head){
-                                        case "needinit":
+                                var ar = Decode(data);
+                                do
+                                {
+                                        var head = ar[0];
+                                        var msg= ar[1];
+                                        console.log("get data "+head + "\t" + msg);
+                                        switch(head){
+                                                case "needinit":
+                                        }
+                                        ar = Decode(null);
                                 }
+                                while(ar.length==2);
+                        }
+                        function stringToBytes ( str ) {  
+                                var ch, st, re = [];  
+                                for (var i = 0; i < str.length; i++ ) {  
+                                        ch = str.charCodeAt(i); 
+                                        st = [];               
+                                        do {  
+                                                st.push( ch & 0xFF ); 
+                                                ch = ch >> 8;        
+                                        }    
+                                        while ( ch );  
+                                        re = re.concat( st.reverse() );  
+                                }  
+                                return re;  
+                        }  
+                        function Send(conn, head, data) {
+                                var _head = stringToBytes(head);
+                                var _data = stringToBytes(data);
+                                var l1 = _head.length;
+                                var l2 = _data.length;
+                                var arr = new Array([l1+l2+6]);
+                                arr[0] = l1 & 0xFF;
+                                arr[1] = (l1>>8) & 0xFF;
+                                arr[2] = l2 & 0xFF;
+                                arr[3] = (l2>>8) & 0xFF;
+                                arr[4] = (l2>>16) & 0xFF;
+                                arr[5] = (l2>>24) & 0xFF;
+                                for(var i=0;i<_head.length;i++) {
+                                        arr[i+6] = _head[i];
+                                }
+                                for(var i=0;i<_head.length;i++) {
+                                        arr[i+6+l1] = _head[i];
+                                }
+                                conn.send(arr);
                         }
                         if (window["WebSocket"]) {
                                 conn = new WebSocket("ws://{{.}}/ws");
+                                conn.binaryType = 'arraybuffer';
                                 conn.onclose = function() {
                                 }
                                 conn.onerror = function(ev) {
@@ -76,9 +128,9 @@
                                 conn.onmessage = function(evt) {
                                         OnRecv(evt.data);
                                 }   
-				conn.onopen = function() {
-					//conn.send("hehehe");
-				}
+                                conn.onopen = function() {
+                                        //conn.send("hehehe");
+                                }
 
                                 } else {
                                 $.alert("<div><b>Your browser does not support WebSockets.</b></div>");
