@@ -46,11 +46,11 @@ func WSWrite(conn *websocket.Conn, head, b []byte) {
         copy(c[6:6+len(head)], head)
         copy(c[6+len(head):], b)
         websocket.Message.Send(conn, c)
-        a:=int(c[0])+int(c[1]>>8)
-        g:=int(c[2])+int(c[3]>>8)+int(c[4]>>16)+int(c[5]>>24)
+        //a:=int(c[0])+int(c[1]>>8)
+        //g:=int(c[2])+int(c[3]>>8)+int(c[4]>>16)+int(c[5]>>24)
 
 
-        log.Println("write", len(c), a, g, len(head), len(b))
+        //log.Println("write", len(c), a, g, len(head), len(b))
 }
 
 type ReadCallBack func(conn *websocket.Conn, head string, arg []byte)
@@ -70,7 +70,7 @@ func split(data []byte, atEOF bool, conn *websocket.Conn, callback ReadCallBack)
         offset := 0
         if len1 + len2 + 6 > l {
                 conn.Close()
-                log.Println("invalid data")
+                log.Println("invalid data", len1, len2, l)
                 return 0, nil, errors.New("invalid data")
         }
         offset += len1+len2+6

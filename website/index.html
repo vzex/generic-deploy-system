@@ -84,25 +84,20 @@
                                 while(ar.length==2);
                         }
                         function stringToBytes ( str ) {  
-                                var ch, st, re = [];  
-                                for (var i = 0; i < str.length; i++ ) {  
-                                        ch = str.charCodeAt(i); 
-                                        st = [];               
-                                        do {  
-                                                st.push( ch & 0xFF ); 
-                                                ch = ch >> 8;        
-                                        }    
-                                        while ( ch );  
-                                        re = re.concat( st.reverse() );  
-                                }  
-                                return re;  
+                                var buf = new ArrayBuffer(str.length);
+                                var bufView = new Uint8Array(buf);
+                                for (var i=0, strLen=str.length; i<strLen; i++) {
+                                        bufView[i] = str.charCodeAt(i);
+                                }
+                                return buf;
                         }  
                         function Send(conn, head, data) {
-                                var _head = stringToBytes(head);
-                                var _data = stringToBytes(data);
-                                var l1 = _head.length;
-                                var l2 = _data.length;
-                                var arr = new Array([l1+l2+6]);
+                                var _head = new Uint8Array(stringToBytes(head));
+                                var _data = new Uint8Array(stringToBytes(data));
+                                var l1 = _head.byteLength;
+                                var l2 = _data.byteLength;
+                                var _arr = new ArrayBuffer(l1+l2+6);
+                                var arr = new Uint8Array(_arr);
                                 arr[0] = l1 & 0xFF;
                                 arr[1] = (l1>>8) & 0xFF;
                                 arr[2] = l2 & 0xFF;
@@ -130,6 +125,8 @@
                                 }   
                                 conn.onopen = function() {
                                         //conn.send("hehehe");
+                                        Send(conn, "test1", "hehe");
+                                        Send(conn, "test2", "hehe2");
                                 }
 
                                 } else {
