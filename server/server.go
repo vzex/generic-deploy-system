@@ -2,6 +2,8 @@ package server
 
 import "../pipe"
 import "log"
+import "encoding/json"
+
 func Listen(addr string) {
 	c := make(chan *pipe.HelperInfo)
 	go func() {
@@ -11,7 +13,12 @@ func Listen(addr string) {
 				switch info.Cmd {
 				case pipe.Leave:
                                         log.Println("leave", info.Conn.RemoteAddr().String())
-                                        ClientTbl.Broadcast([]byte("leave"), []byte(info.Conn.RemoteAddr().String()))
+					m := RemoteTbl.Get(info.Conn)
+					RemoteTbl.Del(info.Conn)
+					if m!=nil {
+						b, _ := json.Marshal(m)
+						ClientTbl.Broadcast([]byte("leave"), b)
+					}
 				case pipe.Enter:
                                         log.Println("enter", info.Conn.RemoteAddr().String())
                                 case pipe.Request:
@@ -24,7 +31,11 @@ func Listen(addr string) {
                                         log.Println("request begin ", _info.Group, _info.Nick, info.Conn.RemoteAddr().String())
                                         RemoteTbl.Add(_info.Group, _info.Nick, info.Conn)
                                         log.Println("end request");
-                                        ClientTbl.Broadcast([]byte("enter"), []byte(_info.Group+":"+_info.Nick))
+					m := RemoteTbl.Get(info.Conn)
+					if m!=nil {
+						b, _ := json.Marshal(m)
+						ClientTbl.Broadcast([]byte("enter"), b)
+					}
                                 case pipe.Response:
                                         log.Println("response")
 				}

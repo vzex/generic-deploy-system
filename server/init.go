@@ -34,56 +34,71 @@ func (c *ClientTblT) Del(conn *websocket.Conn) {
 }
 
 type Machine struct {
-        group string
-        nick string
+        Group string
+        Nick string
         conn net.Conn
 }
 type Machines struct {
-        name string
-        tbl map[string]*Machine
+        Name string
+        Tbl map[string]*Machine
         sync.RWMutex
 }
 func (m *Machines) Add(nick string, conn net.Conn) {
         m.Lock()
-        m.tbl[nick] = &Machine{m.name, nick, conn}
+        m.Tbl[nick] = &Machine{m.Name, nick, conn}
         m.Unlock()
+}
+func (m *Machines) Empty() bool {
+        m.RLock()
+        empty := len(m.Tbl)
+        m.RUnlock()
+        return empty == 0
 }
 func (m *Machines) Get(nick string) *Machine {
         m.RLock()
-        mm, _ := m.tbl[nick]
+        mm, _ := m.Tbl[nick]
         m.RUnlock()
         return mm
 }
 func (m *Machines) Del(nick string) {
         m.Lock()
-        delete(m.tbl, nick)
+        delete(m.Tbl, nick)
         m.Unlock()
 }
 type RemoteTblT struct {
-        tbl map[string]*Machines
+        Tbl map[string]*Machines
         conntbl map[net.Conn]*Machine
         sync.RWMutex
 }
 func (c *RemoteTblT) Add(group, nick string, conn net.Conn) {
         c.Lock()
-        g, have := c.tbl[group]
+        g, have := c.Tbl[group]
         if !have {
-                g = &Machines{tbl:make(map[string]*Machine), name:group}
-                c.tbl[group] = g
+                g = &Machines{Tbl:make(map[string]*Machine), Name:group}
+                c.Tbl[group] = g
         }
         g.Add(nick, conn)
         m:=g.Get(nick)
         c.conntbl[conn]  = m
         c.Unlock()
 }
+func (c *RemoteTblT) Get(conn net.Conn) *Machine {
+        c.RLock()
+        m, _ := c.conntbl[conn]
+        c.RUnlock()
+	return m
+}
 func (c *RemoteTblT) Del(conn net.Conn) {
         c.Lock()
         m, have := c.conntbl[conn]
         if have {
-                g, _have := c.tbl[m.group]
+                g, _have := c.Tbl[m.Group]
                 if _have {
-                        g.Del(m.nick)
+                        g.Del(m.Nick)
                 }
+		if g.Empty() {
+			delete(c.Tbl, m.Group)
+		}
                 delete(c.conntbl, conn)
         }
         c.Unlock()
@@ -94,7 +109,7 @@ var RemoteTbl *RemoteTblT
 func Init() {
 	ClientTbl = &ClientTblT{}
 	ClientTbl.tbl = make(map[*websocket.Conn]bool)
-        RemoteTbl  = &RemoteTblT{tbl:make(map[string]*Machines), conntbl:make(map[net.Conn]*Machine)}
+        RemoteTbl  = &RemoteTblT{Tbl:make(map[string]*Machines), conntbl:make(map[net.Conn]*Machine)}
 	flag.Parse()
         er:=InitAdminPort(*webservice)
         if er !=nil {

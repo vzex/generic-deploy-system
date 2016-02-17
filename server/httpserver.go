@@ -6,6 +6,7 @@ import "bufio"
 import "encoding/binary"
 import "errors"
 import "golang.org/x/net/websocket"
+import "encoding/json"
 
 func InitAdminPort(addr string) error {
         http.Handle("/css/", http.FileServer(http.Dir("website")))
@@ -81,9 +82,10 @@ func split(data []byte, atEOF bool, conn *websocket.Conn, callback ReadCallBack)
 }
 
 func ClientReadCallBack(conn *websocket.Conn, head string, arg []byte) {
-        log.Println("read callback", head, len(arg))
+       //log.Println("read callback", head, len(arg))
        switch head {
-       case "test":
-               println("hehe", string(arg))
+       case "getgrouplist":
+	       b, _ := json.Marshal(RemoteTbl)
+	       WSWrite(conn, []byte("grouplist"), b)
        } 
 }

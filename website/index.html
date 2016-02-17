@@ -1,137 +1,199 @@
 <!DOCTYPE html>
 <html>
-        <head>
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <meta name="description" content="">
-                <title>gds</title>
-                <link href="css/sui.min.css" rel="stylesheet">
-                <script type="text/javascript" src="js/jquery-1.10.2.min.js"></script>
-                <script type="text/javascript" src="js/sui.min.js"></script>
-        </head>
-        <body>
-                <div class="sui-layout">
-                        <div class="sidebar">
-                                <ul class="sui-nav nav-tabs nav-large tab-vertical">
-                                        <li><a>语文</a></li>
-                                        <li class="active"><a href="#index" data-toggle="tab">数学</a></li>
-                                        <li><a href="#profile" data-toggle="tab">英语</a></li>
-                                </ul>
-                        </div>
-                        <div class="content">
-                                <div class="tab-content tab-wraped">
-                                        <div id="index" class="tab-pane active">
-                                                <p>qui irure terry richardson ex squid. Aliquip placeat salvia cillum iphone. Seitan aliquip quis cardigan american apparel, butcher voluptate nisi qui.</p>
-                                        </div>
-                                        <div id="profile" class="tab-pane">
-                                                <p>Art party scenester stumptown, tumblr butcher vero sint qui sapiente accusamus tattooed echo park</p>
-                                        </div>
-                                        <div id="about" class="tab-pane">
-                                                <p>Scenester cred you probably haven't heard of them, vinyl craft beer blog stumptown. Pitchfork sustainable tofu synth chambray yr.</p>
-                                        </div>
-                                        <div id="help" class="tab-pane">
-                                                <p>help!!!help!!!help!!!help!!!help!!!help!!!help!!!help!!!help!!!help!!!help!!!</p>
-                                        </div>
-                                </div>
-                        </div>
-                </div>
-                <script>
-                        var recvData = new ArrayBuffer(0);
-                        function Decode(content) {
-                                if (content==null) {
-                                        return [];
-                                }
-                                var _content = content;
-                                if (recvData.byteLength > 0) {
-                                        _content = new ArrayBuffer(recvData.byteLength+content.byteLength);
-                                        var i = 0;
-                                        for (var n = 0; n < recvData.byteLength; n++) {
-                                                  _content[i] = recvData[n];
-                                                  i++;
-                                          }
-                                        for (var n = 0; n < content.byteLength; n++) {
-                                                  _content[i] = content[n];
-                                                  i++;
-                                          }
-                                }
-                                var view = new Uint8Array(_content);
-                                var l1 = view[0] + (view[1] >> 8);
-                                var l2 = view[2] + (view[3] >> 8) + (view[4] >> 16) + (view[5] >> 24);
-                                var l = l1 + l2 + 6;
-                                //console.log(l1+"s"+l2);
-                                if (_content.length < l) {
-                                        return [];
-                                }
-                                var head =String.fromCharCode.apply(null, new Uint8Array(_content.slice(6, 6+l1)));
-                                var msg = String.fromCharCode.apply(null, new Uint8Array(_content.slice(6+l1, 6+l1+l2)));
-                                recvData = _content.slice(6+l1+l2);
-                                //console.log((l1+l2+6) +"tail:"+recvData.byteLength);
-                                return [head, msg];
-                        }
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="">
+<title>gds</title>
+<link href="css/sui.min.css" rel="stylesheet">
+<script type="text/javascript" src="js/jquery-1.10.2.min.js"></script>
+<script type="text/javascript" src="js/sui.min.js"></script>
+</head>
+<body>
+<div class="sui-layout">
+	<div class="sidebar">
+		<ul id="group" class="sui-nav nav-tabs nav-large tab-vertical">
+		</ul>
+	</div>
+	<div class="content">
+	</div>
+</div>
+<script>
+var recvData = new ArrayBuffer(0);
+function Decode(content) {
+	var _content = content;
+	if (content == null) {
+		_content = recvData;
+	} else {
+		if (recvData.byteLength > 0) {
+			_content = new ArrayBuffer(recvData.byteLength+content.byteLength);
+			var i = 0;
+			for (var n = 0; n < recvData.byteLength; n++) {
+				_content[i] = recvData[n];
+				i++;
+			}
+			for (var n = 0; n < content.byteLength; n++) {
+				_content[i] = content[n];
+				i++;
+			}
+		}
+	}
+	if (_content.byteLength == 0) return [];
+	var view = new Uint8Array(_content);
+	var l1 = view[0] + (view[1] >> 8);
+	var l2 = view[2] + (view[3] >> 8) + (view[4] >> 16) + (view[5] >> 24);
+	var l = l1 + l2 + 6;
+	//console.log(l1+"s"+l2);
+	if (_content.length < l) {
+		return [];
+	}
+	var head =String.fromCharCode.apply(null, new Uint8Array(_content.slice(6, 6+l1)));
+	var msg = String.fromCharCode.apply(null, new Uint8Array(_content.slice(6+l1, 6+l1+l2)));
+	recvData = _content.slice(6+l1+l2);
+	//console.log((l1+l2+6) +"tail:"+recvData.byteLength);
+	return [head, msg];
+}
 
-                        function OnRecv(data) {
-                                var ar = Decode(data);
-                                do
-                                {
-                                        var head = ar[0];
-                                        var msg= ar[1];
-                                        console.log("get data "+head + "\t" + msg);
-                                        switch(head){
-                                                case "needinit":
-                                        }
-                                        ar = Decode(null);
-                                }
-                                while(ar.length==2);
-                        }
-                        function stringToBytes ( str ) {  
-                                var buf = new ArrayBuffer(str.length);
-                                var bufView = new Uint8Array(buf);
-                                for (var i=0, strLen=str.length; i<strLen; i++) {
-                                        bufView[i] = str.charCodeAt(i);
-                                }
-                                return buf;
-                        }  
-                        function Send(conn, head, data) {
-                                var _head = new Uint8Array(stringToBytes(head));
-                                var _data = new Uint8Array(stringToBytes(data));
-                                var l1 = _head.byteLength;
-                                var l2 = _data.byteLength;
-                                var _arr = new ArrayBuffer(l1+l2+6);
-                                var arr = new Uint8Array(_arr);
-                                arr[0] = l1 & 0xFF;
-                                arr[1] = (l1>>8) & 0xFF;
-                                arr[2] = l2 & 0xFF;
-                                arr[3] = (l2>>8) & 0xFF;
-                                arr[4] = (l2>>16) & 0xFF;
-                                arr[5] = (l2>>24) & 0xFF;
-                                for(var i=0;i<_head.length;i++) {
-                                        arr[i+6] = _head[i];
-                                }
-                                for(var i=0;i<_head.length;i++) {
-                                        arr[i+6+l1] = _head[i];
-                                }
-                                conn.send(arr);
-                        }
-                        if (window["WebSocket"]) {
-                                conn = new WebSocket("ws://{{.}}/ws");
-                                conn.binaryType = 'arraybuffer';
-                                conn.onclose = function() {
-                                }
-                                conn.onerror = function(ev) {
-                                        $.alert("connect error");
-                                }
-                                conn.onmessage = function(evt) {
-                                        OnRecv(evt.data);
-                                }   
-                                conn.onopen = function() {
-                                        //conn.send("hehehe");
-                                        Send(conn, "test1", "hehe");
-                                        Send(conn, "test2", "hehe2");
-                                }
+function OnRecv(data) {
+	var ar = Decode(data);
+	do
+	{
+		var head = ar[0];
+		var msg= ar[1];
+		//console.log("get data "+head + "\t" + msg);
+		processMsg(head, msg);
+		ar = Decode(null);
+	}
+	while(ar.length==2);
+}
+function stringToBytes ( str ) {  
+	var buf = new ArrayBuffer(str.length);
+	var bufView = new Uint8Array(buf);
+	for (var i=0, strLen=str.length; i<strLen; i++) {
+		bufView[i] = str.charCodeAt(i);
+	}
+	return buf;
+}  
+function Send(conn, head, data) {
+	var _head = new Uint8Array(stringToBytes(head));
+	var _data = new Uint8Array(stringToBytes(data));
+	var l1 = _head.byteLength;
+	var l2 = _data.byteLength;
+	var _arr = new ArrayBuffer(l1+l2+6);
+	var arr = new Uint8Array(_arr);
+	arr[0] = l1 & 0xFF;
+	arr[1] = (l1>>8) & 0xFF;
+	arr[2] = l2 & 0xFF;
+	arr[3] = (l2>>8) & 0xFF;
+	arr[4] = (l2>>16) & 0xFF;
+	arr[5] = (l2>>24) & 0xFF;
+	for(var i=0;i<_head.length;i++) {
+		arr[i+6] = _head[i];
+	}
+	for(var i=0;i<_head.length;i++) {
+		arr[i+6+l1] = _head[i];
+	}
+	conn.send(arr);
+}
+if (window["WebSocket"]) {
+	conn = new WebSocket("ws://{{.}}/ws");
+	conn.binaryType = 'arraybuffer';
+	conn.onclose = function() {
+	}
+	conn.onerror = function(ev) {
+		$.alert("connect error");
+	}
+	conn.onmessage = function(evt) {
+		OnRecv(evt.data);
+	}   
+	conn.onopen = function() {
+		Send(conn, "getgrouplist", "");
+	}
 
-                                } else {
-                                $.alert("<div><b>Your browser does not support WebSockets.</b></div>");
-                        }  
-                </script>
-        </body>
+} else {
+	$.alert("<div><b>Your browser does not support WebSockets.</b></div>");
+}  
+var groupList=new Object();
+var lastSel = "";
+function updateTree() {
+	var s = "";
+	var ar = Object.keys(groupList);
+	function compare(a,b) {
+		if (a < b)
+			return -1;
+		else if (a > b)
+			return 1;
+		else 
+			return 0;
+	}
+
+	ar.sort(compare);
+	var sel = -1;
+	var bForceClick = false;
+	for(var i in ar) {
+		if(ar[i] == lastSel) {
+			sel = i;
+			break
+		}
+	}
+	if(sel == -1) {
+		sel = 0;
+		bForceClick = true;
+	}
+	for(var i in ar) {
+		if(sel == i) {
+			s+="<li class=\"active\"><a onclick=clicktab(\""+ar[i]+"\") href=\"#\" data-toggle=\"tab\">"+ar[i]+"</a></li>";
+			if(bForceClick) {
+				clicktab(ar[i]);
+			}
+		} else {
+			s+="<li><a onclick=clicktab(\""+ar[i]+"\") href=\"#\" data-toggle=\"tab\">"+ar[i]+"</a></li>";
+		}
+	}
+	document.getElementById("group").innerHTML=s;
+}
+function clicktab(group) {
+	lastSel = group;
+	console.log("onclick:"+group);
+}
+function processMsg(head, msg) {
+	switch(head){
+		case "grouplist":
+			var obj = jQuery.parseJSON(msg);
+			var s = "";
+			for(var group in obj.Tbl) {
+				var m = new Object();
+				groupList[group] = m;
+				for(var nick in obj.Tbl[group].Tbl) {
+					console.log(group + ":" + nick);
+					m[nick] = true;
+				}
+			}
+			updateTree();
+			break;
+		case "leave":
+			var obj = jQuery.parseJSON(msg);
+			var m = groupList[obj.Group];
+			if(m!=null) {
+				delete m[obj.Nick];
+				if(Object.keys(m).length==0) {
+					delete groupList[obj.Group];
+				}
+			}
+			updateTree();
+			break;
+		case "enter":
+			var obj = jQuery.parseJSON(msg);
+			var m = groupList[obj.Group];
+			if(m==null) {
+				m = new Object();
+				groupList[obj.Group] = m;
+			}
+			m[obj.Nick] = true;
+			updateTree();
+			break;
+	}
+}
+</script>
+</body>
 </html>
