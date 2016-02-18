@@ -15,10 +15,18 @@
 		<ul id="group" class="sui-nav nav-tabs nav-large tab-vertical">
 		</ul>
 	</div>
+
 	<div class="content">
+		<span class="sui-dropdown dropdown-bordered select"><span class="dropdown-inner"><a id="select" role="button" href="javascript:void(0);" data-toggle="dropdown" class="dropdown-toggle">
+					<input value="" id="nicklist" type="hidden"><i class="caret"></i><span>选择操作的机器</span></a>
+				<ul id="nicks" role="menu" aria-labelledby="drop1" class="sui-dropdown-menu">
+		</ul></span></span>
+		<div id="buttons">
+		</div>
 	</div>
 </div>
 <script>
+var socket;
 var recvData = new ArrayBuffer(0);
 function Decode(content) {
 	var _content = content;
@@ -90,8 +98,8 @@ function Send(conn, head, data) {
 	for(var i=0;i<_head.length;i++) {
 		arr[i+6] = _head[i];
 	}
-	for(var i=0;i<_head.length;i++) {
-		arr[i+6+l1] = _head[i];
+	for(var i=0;i<_data.length;i++) {
+		arr[i+6+l1] = _data[i];
 	}
 	conn.send(arr);
 }
@@ -107,6 +115,7 @@ if (window["WebSocket"]) {
 		OnRecv(evt.data);
 	}   
 	conn.onopen = function() {
+		socket = conn;
 		Send(conn, "getgrouplist", "");
 	}
 
@@ -151,10 +160,30 @@ function updateTree() {
 		}
 	}
 	document.getElementById("group").innerHTML=s;
+	if(s=="") {
+		lastSel = "";
+		document.getElementById("buttons").innerHTML="";
+		document.getElementById("nicks").innerHTML="";
+	}
 }
 function clicktab(group) {
 	lastSel = group;
 	console.log("onclick:"+group);
+	var m = groupList[group];
+	var s = "<li role=\"presentation\" class=\"group-title\">机器</li>";
+	if(m!=null) {
+		for(var nick in m) {
+			s += "<li role=\"presentation\"><a role=\"menuitem\" tabindex=\"-1\" href=\"javascript:void(0);\" value=\""+nick+"\">"+nick+"</a></li>";
+		}
+	}
+	s += "<li role=\"presentation\" class=\"group-title\">所有</li>";
+	s += "<li role=\"presentation\" class=\"active\"><a role=\"menuitem\" tabindex=\"-1\" href=\"javascript:void(0);\" value=\"all\">所有</a></li>";
+	document.getElementById("nicks").innerHTML=s;
+	Send(socket, "opengroup", group);
+}
+function clickbutton(name) {
+	var m = document.getElementById("nicklist").value;
+	Send(socket, "click", lastSel+"/"+name + ":" + m)
 }
 function processMsg(head, msg) {
 	switch(head){
@@ -192,6 +221,14 @@ function processMsg(head, msg) {
 			m[obj.Nick] = true;
 			updateTree();
 			break;
+		case "buttonlist":
+			var obj = jQuery.parseJSON(msg);
+			var s = "";
+			for(var b in obj) {
+				s+="<a href=\"javascript:clickbutton('"+b+"');\" class=\"sui-btn\">"+b+"</a>";
+			}
+			document.getElementById("buttons").innerHTML=s;
+
 	}
 }
 </script>

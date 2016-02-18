@@ -5,8 +5,10 @@ import "log"
 import "bufio"
 import "encoding/binary"
 import "errors"
+import "strings"
 import "golang.org/x/net/websocket"
 import "encoding/json"
+import "github.com/Shopify/go-lua"
 
 func InitAdminPort(addr string) error {
         http.Handle("/css/", http.FileServer(http.Dir("website")))
@@ -81,11 +83,61 @@ func split(data []byte, atEOF bool, conn *websocket.Conn, callback ReadCallBack)
         return offset, []byte{}, nil
 }
 
+func ClickAction(file string, conn *websocket.Conn) {
+	ar := strings.Split(file, ":")
+	if len(ar) != 2 {return}
+	f, m := ar[0], ar[1]
+	_ar := strings.Split(f, "/")
+	if len(_ar) != 2 {return}
+	group := _ar[0]
+	ms := RemoteTbl.GetMachines(group)
+	log.Println("test", f, m, group)
+	if ms ==nil {
+		return
+	}
+	ca:= func(ma *Machine) {
+		l := lua.NewState()
+		lua.OpenLibraries(l)
+		l.PushString(ma.Nick)
+		l.SetGlobal("MachineName")
+		l.PushString(ma.conn.RemoteAddr().String())
+		l.SetGlobal("MachineAddr")
+		if err := lua.DoFile(l, "logic/"+ f + ".lua"); err != nil {
+			WSWrite(conn, []byte("warning"), []byte(err.Error()))
+		}
+	}
+	if m == "all" {
+		t := ms.GetAll()
+		for _, machine := range t {
+			go ca(machine)
+		}
+	} else {
+		machine := ms.Get(m)
+		if machine == nil {
+			return
+		}
+		go ca(machine)
+	}
+}
+
 func ClientReadCallBack(conn *websocket.Conn, head string, arg []byte) {
-       //log.Println("read callback", head, len(arg))
+       log.Println("read callback", head, len(arg))
        switch head {
        case "getgrouplist":
+	       RemoteTbl.RLock()
 	       b, _ := json.Marshal(RemoteTbl)
+	       RemoteTbl.RUnlock()
 	       WSWrite(conn, []byte("grouplist"), b)
-       } 
+	case "opengroup":
+		groupName := string(arg)
+		buttons, h := LuaActionTbl[groupName]
+		if h {
+			b,_:=json.Marshal(buttons)
+			WSWrite(conn, []byte("buttonlist"), b)
+		}
+	case "click":
+		go ClickAction(string(arg), conn)
+
+       }
 }
+
