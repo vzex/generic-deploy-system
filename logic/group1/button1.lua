@@ -1,3 +1,6 @@
+if bInit then
+        return {name="测试1"}
+end
 print("heheheh")
 --single() check lock, is locked quit
 --arg:{name="test1", sessionId=123, group="qa1", target={nick1,nick2}}

@@ -225,7 +225,7 @@ function processMsg(head, msg) {
 			var obj = jQuery.parseJSON(msg);
 			var s = "";
 			for(var b in obj) {
-				s+="<a href=\"javascript:clickbutton('"+b+"');\" class=\"sui-btn\">"+b+"</a>";
+				s+="<a href=\"javascript:clickbutton('"+b+"');\" class=\"sui-btn\">"+decodeURI(obj[b].Name)+"</a>";
 			}
 			document.getElementById("buttons").innerHTML=s;
 

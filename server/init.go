@@ -3,10 +3,11 @@ package server
 import "flag"
 import "log"
 import "net"
+import "net/url"
 import "os"
 import "golang.org/x/net/websocket"
 import "sync"
-//import "github.com/Shopify/go-lua"
+import "github.com/Shopify/go-lua"
 import "path/filepath"
 
 var service = flag.String("service", "127.0.0.1:8888", "for remote client connect")
@@ -124,7 +125,10 @@ func (c *RemoteTblT) Del(conn net.Conn) {
 
 var ClientTbl *ClientTblT
 var RemoteTbl *RemoteTblT
-var LuaActionTbl map[string](map[string]bool)
+type buttonConfig struct {
+        Name string
+}
+var LuaActionTbl map[string](map[string]*buttonConfig)
 func Init() {
 	ClientTbl = &ClientTblT{}
 	ClientTbl.tbl = make(map[*websocket.Conn]bool)
@@ -140,7 +144,7 @@ func Init() {
 }
 
 func ScanButtons() {
-	LuaActionTbl = make(map[string](map[string]bool))
+	LuaActionTbl = make(map[string](map[string]*buttonConfig))
 	filepath.Walk("./logic", func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() {
 			if err != nil {
@@ -153,11 +157,27 @@ func ScanButtons() {
 					buttonName := string([]byte(name)[:l-4])
 					g, h:=LuaActionTbl[groupName]
 					if !h {
-						g = make(map[string]bool)
+						g = make(map[string]*buttonConfig)
 						LuaActionTbl[groupName] = g
 					}
-					g[buttonName] = true
+                                        config := &buttonConfig{Name:buttonName}
+                                        g[buttonName] = config
 					log.Println("find button:", groupName, buttonName)
+                                        ls := lua.NewState()
+                                        ls.PushBoolean(true)
+                                        ls.SetGlobal("bInit")
+                                        if err := lua.DoFile(ls, path); err != nil {
+                                                panic(err)
+                                        }
+                                        if ls.IsTable(-1) {
+                                                ls.PushString("name")
+                                                ls.Table(-2)
+                                                s, ok:=ls.ToString(-1)
+                                                if ok {
+                                                        config.Name = url.QueryEscape(s)
+                                                        log.Println("name", s)
+                                                }
+                                        }
 				}
 			}
 		}
