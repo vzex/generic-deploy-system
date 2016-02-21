@@ -12,15 +12,12 @@ const (
 	RegRemote
 )
 
-type Action byte
-
-type RequestCmd struct {
-	Id uint64
-	Cmd string
-	OverTime time.Time
-}
-
 type RemoteInfo struct {
 	Group string
 	Nick string
+}
+
+type RequestCmd struct {
+	Id uint
+	Cmd string
 }

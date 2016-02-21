@@ -25,3 +25,12 @@ print("heheheh")
 --dieafter(10)
 --try_dialtimeout(ip+port, 10)
 --sleep(10)
+--
+
+
+function remote_cmd(cmd, callback)
+	SendToRemote("remote_cmd", cmd)
+	WaitForRemote(function(recvStr)
+		print(recvStr)
+	end)
+end

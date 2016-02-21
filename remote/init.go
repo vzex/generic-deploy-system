@@ -2,6 +2,7 @@ package remote
 import "flag"
 import "log"
 import "../pipe"
+import "github.com/Shopify/go-lua"
 
 var service = flag.String("service", "127.0.0.1:8888", "")
 var groupName = flag.String("group", "", "")
@@ -20,8 +21,9 @@ func Init() {
 					d<-true
                                 case pipe.Request:
                                         log.Println("request")
-                                case pipe.Response:
-                                        log.Println("response")
+					var s pipe.RequestCmd
+					pipe.DecodeBytes(info.Msg, &s)
+					handleRequest(s)
                                 }
                         }
                 }
@@ -35,5 +37,25 @@ func Init() {
 	       <-d
         } else {
 		log.Println("dial fail")
+	}
+}
+
+func handleRequest(s pipe.RequestCmd) {
+	l := lua.NewState()
+	lua.OpenLibraries(l)
+	if err := lua.DoFile(l, "internal/init.lua"); err != nil {
+		log.Println(err.Error())
+		return //todo
+	}
+	str:=s.Cmd
+	l.GetGlobal("m")
+	l.PushString("unpack")
+	l.Table(-2)
+	l.PushString(str)
+	l.Call(1,1)
+	l.SetGlobal("RequestInfo")
+	if _err := lua.DoFile(l, "logic_remote/handle.lua"); _err != nil { 
+		log.Println(_err.Error())
+		return //todo
 	}
 }

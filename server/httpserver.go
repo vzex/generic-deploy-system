@@ -10,6 +10,25 @@ import "golang.org/x/net/websocket"
 import "encoding/json"
 import "github.com/Shopify/go-lua"
 
+
+var currId int = 0
+var currId2 int = 0
+func genId() int {
+	currId++
+	if currId > 1073741824 {
+		currId = 0
+	}
+	return currId
+}
+func genId2() int {
+	currId2++
+	if currId2 > 1073741824 {
+		currId2 = 0
+	}
+	return currId2
+}
+var requestMgr requestMgrT
+
 func InitAdminPort(addr string) error {
         http.Handle("/css/", http.FileServer(http.Dir("website")))
         http.Handle("/fonts/", http.FileServer(http.Dir("website")))
@@ -25,7 +44,54 @@ func InitAdminPort(addr string) error {
 	http.Handle("/ws", websocket.Handler(ProcessClient))
         log.Println("begin serve http:", addr)
         go http.ListenAndServe(addr, nil)
+	requestMgr = &requestMgrT{}
+	requestMgr.Init()
         return nil
+}
+
+type requestT struct {
+	m *Machine
+	overT time.Time
+	waitC chan bool
+	id int
+}
+type requestMgrT struct {
+	tbl map[int]*requestT
+	sync.RWMutex
+}
+func (r *requestMgrT) Init() {
+	r.tbl = make(map[int]*requestT)
+	go r.Check()
+}
+
+func (r *requestMgr) Check() {
+	t:=time.NewTicker(10*time.Second)
+	for {
+		select {
+		case <-t.C:
+			curr := time.Now()
+			r.Lock()
+			for id, info := range r.tbl {
+				if info.overT.Before(curr) {
+					delete(r.tbl, id)
+					close(info.waitC)
+				}
+			}
+			r.Unlock()
+		}
+	}
+}
+
+func (r *requestMgr) AddRequest(q *requestT) {
+	r.Lock()
+	id:=genId2()
+	_q, h := r.tbl[id]
+	if h {
+		delete(r.tbl, id)
+		close(_q.waitC)
+	}
+	r.tbl[id] = q
+	r.Unlock()
 }
 
 func ProcessClient(ws *websocket.Conn) {
@@ -102,8 +168,17 @@ func ClickAction(file string, conn *websocket.Conn) {
 		l.SetGlobal("MachineName")
 		l.PushString(ma.conn.RemoteAddr().String())
 		l.SetGlobal("MachineAddr")
-		if err := lua.DoFile(l, "logic/"+ f + ".lua"); err != nil {
-			WSWrite(conn, []byte("warning"), []byte(err.Error()))
+		id := genId()
+		RegLuaFunc(l, "SendToRemote", func(l *lua.State) {
+			SendToRemote(id, ma, l)
+		})
+		if err := lua.DoFile(l, "internal/init.lua"); err != nil {
+			log.Println(err.Error())
+			WSWrite(conn, []byte("error"), []byte(err.Error()))
+		}
+		if _err := lua.DoFile(l, "logic/"+ f + ".lua"); _err != nil {
+			log.Println(_err.Error())
+			WSWrite(conn, []byte("error"), []byte(_err.Error()))
 		}
 	}
 	if m == "all" {
@@ -120,6 +195,50 @@ func ClickAction(file string, conn *websocket.Conn) {
 	}
 }
 
+func RegLuaFunc(l *lua.State, name string, f func(l *lua.State) int) {
+        l.PushGoFunction(f)
+        l.SetGlobal(name)
+}
+
+//-------------------------
+func SendToRemote(requestid int, ma *Machine, l *lua.State) int {
+	s, ok:= l.ToString(1)
+	if !ok {
+		/*lua.LoadString(l, "assert(not pcall(bit32.band, {}))")
+		l.Call(0, 0)*/
+		lua.ErrorF(l ,"SendToRemote no string arg")
+		return 0
+	}
+	sec, _ok := l.ToInteger(2)
+	if !_ok {
+		lua.ErrorF(l ,"SendToRemote no timeout arg")
+		return 0
+	}
+	c:=make(chan responseT)
+	requestMgr.Add(&requestT{id:requestid, m:ma,waitC:c, overT:time.Now().Add(time.Hour)})
+	k:=&pipe.RequestCmd{requestid, s}
+	pipe.Send(ma.conn, pipe.Request, k)
+	t:=time.NewTicker(time.Second*sec)
+	for {
+		select {
+		case info:= <- c:
+			switch info.head {
+			case "recv":
+				msg:=info.msg
+				if l.IsFunction(3) {
+					l.PushString(msg)
+					l.Call(1, 0)
+				}
+			case "end":
+				l.PushString(info.msg)
+				return 1
+			}
+		case <-t:
+			return 0
+		}
+	}
+}
+//-------------------------
 func ClientReadCallBack(conn *websocket.Conn, head string, arg []byte) {
        log.Println("read callback", head, len(arg))
        switch head {
