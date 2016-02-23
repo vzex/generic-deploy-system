@@ -1,5 +1,4 @@
 package pipe
-import "time"
 
 const (
 	//server spec cmd

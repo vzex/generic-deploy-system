@@ -2,7 +2,10 @@ package server
 import "net/http"
 import "html/template"
 import "log"
+import "time"
+import "../pipe"
 import "bufio"
+import "sync"
 import "encoding/binary"
 import "errors"
 import "strings"
@@ -27,7 +30,11 @@ func genId2() int {
 	}
 	return currId2
 }
-var requestMgr requestMgrT
+var requestMgr *requestMgrT
+type responseT struct {
+        head string
+        msg string
+}
 
 func InitAdminPort(addr string) error {
         http.Handle("/css/", http.FileServer(http.Dir("website")))
@@ -52,7 +59,7 @@ func InitAdminPort(addr string) error {
 type requestT struct {
 	m *Machine
 	overT time.Time
-	waitC chan bool
+	waitC chan responseT
 	id int
 }
 type requestMgrT struct {
@@ -64,7 +71,7 @@ func (r *requestMgrT) Init() {
 	go r.Check()
 }
 
-func (r *requestMgr) Check() {
+func (r *requestMgrT) Check() {
 	t:=time.NewTicker(10*time.Second)
 	for {
 		select {
@@ -82,7 +89,7 @@ func (r *requestMgr) Check() {
 	}
 }
 
-func (r *requestMgr) AddRequest(q *requestT) {
+func (r *requestMgrT) AddRequest(q *requestT) {
 	r.Lock()
 	id:=genId2()
 	_q, h := r.tbl[id]
@@ -169,8 +176,8 @@ func ClickAction(file string, conn *websocket.Conn) {
 		l.PushString(ma.conn.RemoteAddr().String())
 		l.SetGlobal("MachineAddr")
 		id := genId()
-		RegLuaFunc(l, "SendToRemote", func(l *lua.State) {
-			SendToRemote(id, ma, l)
+		RegLuaFunc(l, "SendToRemote", func(l *lua.State) int {
+			return SendToRemote(id, ma, l)
 		})
 		if err := lua.DoFile(l, "internal/init.lua"); err != nil {
 			log.Println(err.Error())
@@ -204,21 +211,21 @@ func RegLuaFunc(l *lua.State, name string, f func(l *lua.State) int) {
 func SendToRemote(requestid int, ma *Machine, l *lua.State) int {
 	s, ok:= l.ToString(1)
 	if !ok {
-		/*lua.LoadString(l, "assert(not pcall(bit32.band, {}))")
-		l.Call(0, 0)*/
-		lua.ErrorF(l ,"SendToRemote no string arg")
+		lua.LoadString(l, "SendToRemote no string arg")
+		l.Call(0, 0)
 		return 0
 	}
 	sec, _ok := l.ToInteger(2)
 	if !_ok {
-		lua.ErrorF(l ,"SendToRemote no timeout arg")
+		lua.LoadString(l, "SendToRemote no timeout arg")
+		l.Call(0, 0)
 		return 0
 	}
 	c:=make(chan responseT)
-	requestMgr.Add(&requestT{id:requestid, m:ma,waitC:c, overT:time.Now().Add(time.Hour)})
-	k:=&pipe.RequestCmd{requestid, s}
+	requestMgr.AddRequest(&requestT{id:requestid, m:ma,waitC:c, overT:time.Now().Add(time.Hour)})
+	k:=&pipe.RequestCmd{uint(requestid), s}
 	pipe.Send(ma.conn, pipe.Request, k)
-	t:=time.NewTicker(time.Second*sec)
+	t:=time.NewTicker(time.Second*time.Duration(sec))
 	for {
 		select {
 		case info:= <- c:
@@ -233,7 +240,7 @@ func SendToRemote(requestid int, ma *Machine, l *lua.State) int {
 				l.PushString(info.msg)
 				return 1
 			}
-		case <-t:
+		case <-t.C:
 			return 0
 		}
 	}

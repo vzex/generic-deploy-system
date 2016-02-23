@@ -22,7 +22,7 @@ func Init() {
                                 case pipe.Request:
                                         log.Println("request")
 					var s pipe.RequestCmd
-					pipe.DecodeBytes(info.Msg, &s)
+					pipe.DecodeBytes(info.Bytes, &s)
 					handleRequest(s)
                                 }
                         }
@@ -48,7 +48,7 @@ func handleRequest(s pipe.RequestCmd) {
 		return //todo
 	}
 	str:=s.Cmd
-	l.GetGlobal("m")
+	l.Global("m")
 	l.PushString("unpack")
 	l.Table(-2)
 	l.PushString(str)
