@@ -7,7 +7,7 @@ import "net/url"
 import "os"
 import "golang.org/x/net/websocket"
 import "sync"
-import "github.com/Shopify/go-lua"
+import "github.com/yuin/gopher-lua"
 import "path/filepath"
 
 var service = flag.String("service", "127.0.0.1:8888", "for remote client connect")
@@ -150,7 +150,7 @@ func ScanButtons() {
 			if err != nil {
 				log.Println("search button fail", err.Error())
 			} else {
-				if filepath.Dir(filepath.Dir(path)) == "logic" && filepath.Ext(path) == ".lua" {
+				if filepath.Dir(filepath.Dir(path)) == "logic" && filepath.Ext(path) == ".lua" && filepath.Base(filepath.Dir(path)) != "internal" {
 					name := info.Name()
 					l := len(name)
 					groupName := filepath.Base(filepath.Dir(path))
@@ -164,17 +164,15 @@ func ScanButtons() {
                                         g[buttonName] = config
 					log.Println("find button:", groupName, buttonName)
                                         ls := lua.NewState()
-                                        ls.PushBoolean(true)
-                                        ls.SetGlobal("bInit")
-                                        if err := lua.DoFile(ls, path); err != nil {
+                                        ls.SetGlobal("bInit", lua.LBool(true))
+                                        if err := ls.DoFile(path); err != nil {
                                                 panic(err)
                                         }
-                                        if ls.IsTable(-1) {
-                                                ls.PushString("name")
-                                                ls.Table(-2)
-                                                s, ok:=ls.ToString(-1)
-                                                if ok {
-                                                        config.Name = url.QueryEscape(s)
+                                        if t:= ls.Get(-1); t.Type()==lua.LTTable {
+                                                v := t.(*lua.LTable).RawGetString("name")
+                                                if v.Type() == lua.LTString {
+                                                        s, _:= v.(lua.LString)
+                                                        config.Name = url.QueryEscape(string(s))
                                                         log.Println("name", s)
                                                 }
                                         }

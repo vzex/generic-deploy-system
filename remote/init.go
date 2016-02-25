@@ -2,7 +2,7 @@ package remote
 import "flag"
 import "log"
 import "../pipe"
-import "github.com/Shopify/go-lua"
+import "github.com/yuin/gopher-lua"
 
 var service = flag.String("service", "127.0.0.1:8888", "")
 var groupName = flag.String("group", "", "")
@@ -42,19 +42,20 @@ func Init() {
 
 func handleRequest(s pipe.RequestCmd) {
 	l := lua.NewState()
-	lua.OpenLibraries(l)
-	if err := lua.DoFile(l, "internal/init.lua"); err != nil {
+	l.OpenLibs()
+	if err := l.DoFile("internal/init.lua"); err != nil {
 		log.Println(err.Error())
 		return //todo
 	}
 	str:=s.Cmd
-	l.Global("m")
-	l.PushString("unpack")
-	l.Table(-2)
-	l.PushString(str)
+        t := l.CheckTable(-1)
+        f := t.RawGetString("unpack")
+        l.Push(f)
+        l.Push(lua.LString(str))
 	l.Call(1,1)
-	l.SetGlobal("RequestInfo")
-	if _err := lua.DoFile(l, "logic_remote/handle.lua"); _err != nil { 
+	l.SetGlobal("RequestInfo", l.CheckTable(-1))
+        l.Pop(1)
+	if _err := l.DoFile("logic_remote/handle.lua"); _err != nil { 
 		log.Println(_err.Error())
 		return //todo
 	}

@@ -11,7 +11,7 @@ import "errors"
 import "strings"
 import "golang.org/x/net/websocket"
 import "encoding/json"
-import "github.com/Shopify/go-lua"
+import "github.com/yuin/gopher-lua"
 
 
 var currId int = 0
@@ -170,21 +170,22 @@ func ClickAction(file string, conn *websocket.Conn) {
 	}
 	ca:= func(ma *Machine) {
 		l := lua.NewState()
-		lua.OpenLibraries(l)
-		l.PushString(ma.Nick)
-		l.SetGlobal("MachineName")
-		l.PushString(ma.conn.RemoteAddr().String())
-		l.SetGlobal("MachineAddr")
+		l.OpenLibs()
+		l.SetGlobal("MachineName", lua.LString(ma.Nick))
+		l.SetGlobal("MachineAddr", lua.LString(ma.conn.RemoteAddr().String()))
 		id := genId()
-		RegLuaFunc(l, "SendToRemote", func(l *lua.State) int {
+		RegLuaFunc(l, "SendToRemote", func(l *lua.LState) int {
 			return SendToRemote(id, ma, l)
 		})
-		if err := lua.DoFile(l, "internal/init.lua"); err != nil {
-			log.Println(err.Error())
+		if err := l.DoFile("logic/internal/init.lua"); err != nil {
+                        log.Println("call init file fail:", err.Error())
 			WSWrite(conn, []byte("error"), []byte(err.Error()))
+                        return
 		}
-		if _err := lua.DoFile(l, "logic/"+ f + ".lua"); _err != nil {
-			log.Println(_err.Error())
+                l.SetGlobal("MsgPack", l.Get(-1))
+                l.Pop(1)
+		if _err := l.DoFile("logic/"+ f + ".lua"); _err != nil {
+                        log.Println("call logic file fail:", _err.Error())
 			WSWrite(conn, []byte("error"), []byte(_err.Error()))
 		}
 	}
@@ -202,25 +203,14 @@ func ClickAction(file string, conn *websocket.Conn) {
 	}
 }
 
-func RegLuaFunc(l *lua.State, name string, f func(l *lua.State) int) {
-        l.PushGoFunction(f)
-        l.SetGlobal(name)
+func RegLuaFunc(l *lua.LState, name string, f func(l *lua.LState) int) {
+        l.SetGlobal(name, l.NewFunction(f))
 }
 
 //-------------------------
-func SendToRemote(requestid int, ma *Machine, l *lua.State) int {
-	s, ok:= l.ToString(1)
-	if !ok {
-		lua.LoadString(l, "SendToRemote no string arg")
-		l.Call(0, 0)
-		return 0
-	}
-	sec, _ok := l.ToInteger(2)
-	if !_ok {
-		lua.LoadString(l, "SendToRemote no timeout arg")
-		l.Call(0, 0)
-		return 0
-	}
+func SendToRemote(requestid int, ma *Machine, l *lua.LState) int {
+	s := l.CheckString(1)
+	sec := l.CheckInt(2)
 	c:=make(chan responseT)
 	requestMgr.AddRequest(&requestT{id:requestid, m:ma,waitC:c, overT:time.Now().Add(time.Hour)})
 	k:=&pipe.RequestCmd{uint(requestid), s}
@@ -232,12 +222,12 @@ func SendToRemote(requestid int, ma *Machine, l *lua.State) int {
 			switch info.head {
 			case "recv":
 				msg:=info.msg
-				if l.IsFunction(3) {
-					l.PushString(msg)
+				if l.CheckFunction(3) != nil {
+					l.Push(lua.LString(msg))
 					l.Call(1, 0)
 				}
 			case "end":
-				l.PushString(info.msg)
+				l.Push(lua.LString(info.msg))
 				return 1
 			}
 		case <-t.C:
