@@ -43,7 +43,7 @@ func Init() {
 func handleRequest(s pipe.RequestCmd) {
 	l := lua.NewState()
 	l.OpenLibs()
-	if err := l.DoFile("internal/init.lua"); err != nil {
+	if err := l.DoFile("logic/internal/init.lua"); err != nil {
 		log.Println(err.Error())
 		return //todo
 	}

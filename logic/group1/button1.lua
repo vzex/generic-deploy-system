@@ -31,10 +31,10 @@ for a,b in pairs(s) do print(a,b) end
 --sleep(10)
 --
 
-
 function remote_cmd(cmd, callback)
-	SendToRemote("remote_cmd", cmd)
-	WaitForRemote(function(recvStr)
-		print(recvStr)
-	end)
+	SendToRemote(cmd, 3, callback)
 end
+remote_cmd("test", function(aa) 
+	print("recv", aa)
+end)
+
