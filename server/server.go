@@ -37,7 +37,9 @@ func Listen(addr string) {
 						ClientTbl.Broadcast([]byte("enter"), b)
 					}
                                 case pipe.Response:
-                                        log.Println("response")
+					var s pipe.ResponseCmd
+					pipe.DecodeBytes(info.Bytes, &s)
+					OnRecvMsg(s)
 				}
 			}
 		}

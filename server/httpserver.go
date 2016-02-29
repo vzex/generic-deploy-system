@@ -58,8 +58,8 @@ func InitAdminPort(addr string) error {
 
 type requestT struct {
 	m *Machine
-	overT time.Time
 	waitC chan responseT
+	closeC chan bool
 	id int
 }
 type requestMgrT struct {
@@ -68,25 +68,13 @@ type requestMgrT struct {
 }
 func (r *requestMgrT) Init() {
 	r.tbl = make(map[int]*requestT)
-	go r.Check()
 }
 
-func (r *requestMgrT) Check() {
-	t:=time.NewTicker(10*time.Second)
-	for {
-		select {
-		case <-t.C:
-			curr := time.Now()
-			r.Lock()
-			for id, info := range r.tbl {
-				if info.overT.Before(curr) {
-					delete(r.tbl, id)
-					close(info.waitC)
-				}
-			}
-			r.Unlock()
-		}
-	}
+func (r *requestMgrT) GetRequest(id int) *requestT {
+	r.RLock()
+	_q, _ := r.tbl[id]
+	r.RUnlock()
+	return _q
 }
 
 func (r *requestMgrT) AddRequest(q *requestT) {
@@ -95,9 +83,18 @@ func (r *requestMgrT) AddRequest(q *requestT) {
 	_q, h := r.tbl[id]
 	if h {
 		delete(r.tbl, id)
-		close(_q.waitC)
+		close(_q.closeC)
 	}
 	r.tbl[id] = q
+	r.Unlock()
+}
+func (r *requestMgrT) RemoveRequest(id int) {
+	r.Lock()
+	_q, h := r.tbl[id]
+	if h {
+		delete(r.tbl, id)
+		close(_q.closeC)
+	}
 	r.Unlock()
 }
 
@@ -164,7 +161,7 @@ func ClickAction(file string, conn *websocket.Conn) {
 	if len(_ar) != 2 {return}
 	group := _ar[0]
 	ms := RemoteTbl.GetMachines(group)
-	log.Println("test", f, m, group)
+	//log.Println("test", f, m, group)
 	if ms ==nil {
 		return
 	}
@@ -203,19 +200,16 @@ func ClickAction(file string, conn *websocket.Conn) {
 	}
 }
 
-func RegLuaFunc(l *lua.LState, name string, f func(l *lua.LState) int) {
-        l.SetGlobal(name, l.NewFunction(f))
-}
-
 //-------------------------
 func SendToRemote(requestid int, ma *Machine, l *lua.LState) int {
 	s := l.CheckString(1)
 	sec := l.CheckInt(2)
 	c:=make(chan responseT)
-	requestMgr.AddRequest(&requestT{id:requestid, m:ma,waitC:c, overT:time.Now().Add(time.Hour)})
+	requestMgr.AddRequest(&requestT{id:requestid, m:ma,waitC:c, closeC:make(chan bool)})
 	k:=&pipe.RequestCmd{uint(requestid), s}
 	pipe.Send(ma.conn, pipe.Request, k)
 	t:=time.NewTicker(time.Second*time.Duration(sec))
+	defer requestMgr.RemoveRequest(requestid)
 	for {
 		select {
 		case info:= <- c:
@@ -237,7 +231,7 @@ func SendToRemote(requestid int, ma *Machine, l *lua.LState) int {
 }
 //-------------------------
 func ClientReadCallBack(conn *websocket.Conn, head string, arg []byte) {
-       log.Println("read callback", head, len(arg))
+       //log.Println("read callback", head, len(arg))
        switch head {
        case "getgrouplist":
 	       RemoteTbl.RLock()
@@ -257,3 +251,18 @@ func ClientReadCallBack(conn *websocket.Conn, head string, arg []byte) {
        }
 }
 
+func OnRecvMsg(s pipe.ResponseCmd) {
+	id := s.Id
+	q:=requestMgr.GetRequest(int(id))
+	//log.Println("get request", id , q)
+	if q == nil {
+		return
+	}
+	select {
+	case <-q.closeC:
+	case q.waitC <- responseT{s.Action, s.Cmd}:
+	}
+}
+func RegLuaFunc(l *lua.LState, name string, f func(l *lua.LState) int) {
+	l.SetGlobal(name, l.NewFunction(f))
+}

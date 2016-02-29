@@ -1,6 +1,7 @@
 package remote
 import "flag"
 import "log"
+import "net"
 import "../pipe"
 import "github.com/yuin/gopher-lua"
 
@@ -20,10 +21,9 @@ func Init() {
 				case pipe.Shutdown:
 					d<-true
                                 case pipe.Request:
-                                        log.Println("request")
 					var s pipe.RequestCmd
 					pipe.DecodeBytes(info.Bytes, &s)
-					handleRequest(s)
+					handleRequest(s, info.Conn)
                                 }
                         }
                 }
@@ -40,23 +40,40 @@ func Init() {
 	}
 }
 
-func handleRequest(s pipe.RequestCmd) {
+func handleRequest(s pipe.RequestCmd, conn net.Conn) {
 	l := lua.NewState()
 	l.OpenLibs()
 	if err := l.DoFile("logic/internal/init.lua"); err != nil {
 		log.Println(err.Error())
 		return //todo
 	}
+	l.SetGlobal("MsgPack", l.Get(-1))
+	l.Pop(1)
+	id := s.Id
+	RegLuaFunc(l, "SendToRemote", func(l *lua.LState) int {
+		return SendToRemote(int(id), l, conn, "recv")
+	})
+	RegLuaFunc(l, "SendToRemoteEnd", func(l *lua.LState) int {
+		return SendToRemote(int(id), l, conn, "end")
+	})
 	str:=s.Cmd
-        t := l.CheckTable(-1)
-        f := t.RawGetString("unpack")
-        l.Push(f)
-        l.Push(lua.LString(str))
-	l.Call(1,1)
-	l.SetGlobal("RequestInfo", l.CheckTable(-1))
-        l.Pop(1)
 	if _err := l.DoFile("logic_remote/handle.lua"); _err != nil { 
 		log.Println(_err.Error())
 		return //todo
 	}
+	l.Push(l.GetGlobal("_handle"))
+	l.Push(lua.LString(str))
+	l.Call(1, 0)
+	l.Push(lua.LString(""))
+	SendToRemote(int(id), l, conn, "end")
+}
+
+func SendToRemote(requestid int, l *lua.LState, conn net.Conn, t string) int {
+	s := l.CheckString(1)
+	k := &pipe.ResponseCmd{uint(requestid), s, t}
+	pipe.Send(conn, pipe.Response, k)
+	return 0
+}
+func RegLuaFunc(l *lua.LState, name string, f func(l *lua.LState) int) {
+	l.SetGlobal(name, l.NewFunction(f))
 }

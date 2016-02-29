@@ -20,3 +20,9 @@ type RequestCmd struct {
 	Id uint
 	Cmd string
 }
+
+type ResponseCmd struct {
+	Id uint
+	Cmd string
+	Action string
+}
