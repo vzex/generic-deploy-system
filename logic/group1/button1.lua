@@ -1,10 +1,6 @@
 if bInit then
         return {name="测试1"}
 end
-local t = {43,45,6}
-local g = MsgPack.pack(t)
-local s = MsgPack.unpack(g)
-for a,b in pairs(s) do print(a,b) end
 --single() check lock, is locked quit
 --remote_cmd("ls -l", function(status, recv)
 --	print(status, recv)

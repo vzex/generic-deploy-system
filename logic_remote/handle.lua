@@ -8,6 +8,6 @@ function test(info)
 		print(a,b)
 		SendToRemote(MsgPack.pack({"response", a, b}))
 	end
-	SendToRemoteEnd("final")
+	SendToRemoteEnd(MachineName)
 end
 

@@ -63,7 +63,9 @@ func handleRequest(s pipe.RequestCmd, conn net.Conn) {
 	}
 	l.Push(l.GetGlobal("_handle"))
 	l.Push(lua.LString(str))
-	l.Call(1, 0)
+	if e := l.PCall(1, 0, nil); e != nil {
+		log.Println(e.Error())
+	}
 	l.Push(lua.LString(""))
 	SendToRemote(int(id), l, conn, "end")
 }

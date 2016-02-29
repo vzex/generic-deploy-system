@@ -16,20 +16,17 @@ import "github.com/yuin/gopher-lua"
 
 var currId int = 0
 var currId2 int = 0
+var genIdLock sync.RWMutex
 func genId() int {
+	genIdLock.Lock()
+	defer genIdLock.Unlock()
 	currId++
 	if currId > 1073741824 {
 		currId = 0
 	}
 	return currId
 }
-func genId2() int {
-	currId2++
-	if currId2 > 1073741824 {
-		currId2 = 0
-	}
-	return currId2
-}
+
 var requestMgr *requestMgrT
 type responseT struct {
         head string
@@ -79,19 +76,21 @@ func (r *requestMgrT) GetRequest(id int) *requestT {
 
 func (r *requestMgrT) AddRequest(q *requestT) {
 	r.Lock()
-	id:=genId2()
+	id := q.id
 	_q, h := r.tbl[id]
 	if h {
 		delete(r.tbl, id)
 		close(_q.closeC)
 	}
 	r.tbl[id] = q
+	//log.Println("add req", id)
 	r.Unlock()
 }
 func (r *requestMgrT) RemoveRequest(id int) {
 	r.Lock()
 	_q, h := r.tbl[id]
 	if h {
+		//log.Println("remove req", id)
 		delete(r.tbl, id)
 		close(_q.closeC)
 	}
@@ -170,8 +169,8 @@ func ClickAction(file string, conn *websocket.Conn) {
 		l.OpenLibs()
 		l.SetGlobal("MachineName", lua.LString(ma.Nick))
 		l.SetGlobal("MachineAddr", lua.LString(ma.conn.RemoteAddr().String()))
-		id := genId()
 		RegLuaFunc(l, "SendToRemote", func(l *lua.LState) int {
+			id := genId()
 			return SendToRemote(id, ma, l)
 		})
 		if err := l.DoFile("logic/internal/init.lua"); err != nil {
@@ -218,7 +217,9 @@ func SendToRemote(requestid int, ma *Machine, l *lua.LState) int {
 				msg:=info.msg
 				if l.CheckFunction(3) != nil {
 					l.Push(lua.LString(msg))
-					l.Call(1, 0)
+					if e := l.PCall(1, 0, nil); e !=nil {
+						log.Println(e.Error())
+					}
 				}
 			case "end":
 				l.Push(lua.LString(info.msg))
