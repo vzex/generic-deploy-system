@@ -25,9 +25,9 @@ end
 --sleep(10)
 --
 
-local endStr = remote_cmd("test", function(aa) 
+local endStr = remote_cmd("ls -l", function(aa) 
 	local tbl = MsgPack.unpack(aa)
 	for a,b in pairs(tbl) do print(a,b) end
 end)
 
-print("test over", endStr)
+--print("test over", endStr)

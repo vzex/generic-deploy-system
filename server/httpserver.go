@@ -12,6 +12,7 @@ import "strings"
 import "golang.org/x/net/websocket"
 import "encoding/json"
 import "github.com/yuin/gopher-lua"
+import "../common"
 
 
 var currId int = 0
@@ -167,9 +168,11 @@ func ClickAction(file string, conn *websocket.Conn) {
 	ca:= func(ma *Machine) {
 		l := lua.NewState()
 		l.OpenLibs()
+		l.SetGlobal("MachineGroup", lua.LString(group))
 		l.SetGlobal("MachineName", lua.LString(ma.Nick))
 		l.SetGlobal("MachineAddr", lua.LString(ma.conn.RemoteAddr().String()))
-		RegLuaFunc(l, "SendToRemote", func(l *lua.LState) int {
+                common.InitCommon(l)
+		common.RegLuaFunc(l, "SendToRemote", func(l *lua.LState) int {
 			id := genId()
 			return SendToRemote(id, ma, l)
 		})
@@ -263,7 +266,4 @@ func OnRecvMsg(s pipe.ResponseCmd) {
 	case <-q.closeC:
 	case q.waitC <- responseT{s.Action, s.Cmd}:
 	}
-}
-func RegLuaFunc(l *lua.LState, name string, f func(l *lua.LState) int) {
-	l.SetGlobal(name, l.NewFunction(f))
 }

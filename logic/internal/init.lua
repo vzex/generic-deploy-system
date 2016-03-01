@@ -1,5 +1,6 @@
 local m = require "logic/internal/pack"
-function remote_cmd(cmd, callback)
-	return SendToRemote(MsgPack.pack({Head=cmd}), 3, callback)
+-- SendToRemote(str, timeoutsec, callback(data))
+function remote_cmd(cmd, callback, timeout)
+	return SendToRemote(MsgPack.pack({Action="cmd", Cmd=cmd}), timeout or 10, callback)
 end
 return m

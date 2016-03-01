@@ -4,6 +4,7 @@ import "log"
 import "net"
 import "../pipe"
 import "github.com/yuin/gopher-lua"
+import "../common"
 
 var service = flag.String("service", "127.0.0.1:8888", "")
 var groupName = flag.String("group", "", "")
@@ -23,7 +24,7 @@ func Init() {
                                 case pipe.Request:
 					var s pipe.RequestCmd
 					pipe.DecodeBytes(info.Bytes, &s)
-					handleRequest(s, info.Conn)
+					go handleRequest(s, info.Conn)
                                 }
                         }
                 }
@@ -43,39 +44,47 @@ func Init() {
 func handleRequest(s pipe.RequestCmd, conn net.Conn) {
 	l := lua.NewState()
 	l.OpenLibs()
-	if err := l.DoFile("logic/internal/init.lua"); err != nil {
+        common.InitCommon(l)
+	if err := l.DoFile("logic_remote/internal/init.lua"); err != nil {
 		log.Println(err.Error())
 		return //todo
 	}
 	l.SetGlobal("MsgPack", l.Get(-1))
 	l.Pop(1)
 	id := s.Id
-	RegLuaFunc(l, "SendToRemote", func(l *lua.LState) int {
-		return SendToRemote(int(id), l, conn, "recv")
+	common.RegLuaFunc(l, "SendBack", func(l *lua.LState) int {
+		return SendBack(int(id), l, conn, "recv")
 	})
-	RegLuaFunc(l, "SendToRemoteEnd", func(l *lua.LState) int {
-		return SendToRemote(int(id), l, conn, "end")
+	common.RegLuaFunc(l, "SendBackEnd", func(l *lua.LState) int {
+		return SendBack(int(id), l, conn, "end")
 	})
 	str:=s.Cmd
 	if _err := l.DoFile("logic_remote/handle.lua"); _err != nil { 
 		log.Println(_err.Error())
 		return //todo
 	}
-	l.Push(l.GetGlobal("_handle"))
+        mp:=l.GetGlobal("MsgPack")
+        l.Push(mp.(*lua.LTable).RawGetString("unpack"))
 	l.Push(lua.LString(str))
-	if e := l.PCall(1, 0, nil); e != nil {
+
+	if e := l.PCall(1, 1, nil); e != nil {
 		log.Println(e.Error())
 	}
-	l.Push(lua.LString(""))
-	SendToRemote(int(id), l, conn, "end")
+        t:=l.Get(-1)
+        action := "handle_"  + string(t.(*lua.LTable).RawGetString("Action").(lua.LString))
+        l.Push(l.GetGlobal(action))
+	l.Push(t)
+	if e := l.PCall(1, 0, nil); e != nil {
+		log.Println("call error", e.Error())
+	}
+        l.SetTop(0)
+        l.Push(lua.LString(""))
+	SendBack(int(id), l, conn, "end")
 }
 
-func SendToRemote(requestid int, l *lua.LState, conn net.Conn, t string) int {
+func SendBack(requestid int, l *lua.LState, conn net.Conn, t string) int {
 	s := l.CheckString(1)
 	k := &pipe.ResponseCmd{uint(requestid), s, t}
 	pipe.Send(conn, pipe.Response, k)
 	return 0
-}
-func RegLuaFunc(l *lua.LState, name string, f func(l *lua.LState) int) {
-	l.SetGlobal(name, l.NewFunction(f))
 }
