@@ -17,6 +17,7 @@ type RemoteInfo struct {
 }
 
 type RequestCmd struct {
+        SessionId int
 	Id uint
 	Cmd string
 }

@@ -13,10 +13,50 @@ import "path/filepath"
 var service = flag.String("service", "127.0.0.1:8888", "for remote client connect")
 var webservice = flag.String("web", "127.0.0.1:8080", "http server port")
 
+type sessionInfo struct {
+        quitC chan bool
+        id int
+}
+
+type ClientT struct {
+        sessionTbl map[int]*sessionInfo
+        sessionLock sync.RWMutex
+}
+
+func (c *ClientT) Init() {
+        c.sessionTbl = make(map[int]*sessionInfo)
+}
+
+func (c *ClientT) AddSession() *sessionInfo {
+        id := genId()
+        s := &sessionInfo{make(chan bool), id}
+        c.sessionLock.Lock()
+        c.sessionTbl[id] = s
+        c.sessionLock.Unlock()
+        return s
+}
+
+func (c *ClientT) DelSession(id int) {
+        c.sessionLock.Lock()
+        s, b := c.sessionTbl[id]
+        if b {
+                close(s.quitC)
+                delete(c.sessionTbl, id)
+        }
+        c.sessionLock.Unlock()
+}
+
+func (c *ClientT) OnRemove() {
+        for id, _ := range c.sessionTbl {
+                c.DelSession(id)
+        }
+}
+
 type ClientTblT struct {
-	tbl map[*websocket.Conn]bool
+	tbl map[*websocket.Conn]*ClientT
 	sync.RWMutex
 }
+
 func (c *ClientTblT) Broadcast(head, b []byte) {
         log.Println("begin Broadcast");
         c.RLock()
@@ -26,57 +66,34 @@ func (c *ClientTblT) Broadcast(head, b []byte) {
         c.RUnlock()
         log.Println("end Broadcast");
 }
-func (c *ClientTblT) Add(conn *websocket.Conn) {
+func (c *ClientTblT) Add(conn *websocket.Conn) *sessionInfo {
         c.Lock()
-        c.tbl[conn] = true
+        client := &ClientT{}
+        client.Init()
+        c.tbl[conn] = client
         c.Unlock()
+        return client
+}
+func (c *ClientTblT) Get(conn *websocket.Conn) *sessionInfo {
+        c.RLock()
+        _m, _ := c.tbl[conn]
+        c.RUnlock()
+        return _m
 }
 func (c *ClientTblT) Del(conn *websocket.Conn) {
+        _m := c.Get(conn)
+        if _m != nil {
+                _m.OnRemove()
+        }
         c.Lock()
         delete(c.tbl, conn)
         c.Unlock()
-}
-
-type sessionInfo struct {
-        quitC chan bool
-        id int
 }
 
 type Machine struct {
         Group string
         Nick string
         conn net.Conn
-        sessionTbl map[int]*sessionInfo
-        sessionLock sync.RWMutex
-}
-
-func (m *Machine) Init() {
-        m.sessionTbl = make(map[int]*sessionInfo)
-}
-
-func (m *Machine) AddSession() *sessionInfo {
-        id := genId()
-        s := &sessionInfo{make(chan bool), id}
-        m.sessionLock.Lock()
-        m.sessionTbl[id] = s
-        m.sessionLock.Unlock()
-        return s
-}
-
-func (m *Machine) DelSession(id int) {
-        m.sessionLock.Lock()
-        s, b := m.sessionTbl[id]
-        if b {
-                close(s.quitC)
-                delete(m.sessionTbl, id)
-        }
-        m.sessionLock.Unlock()
-}
-
-func (m *Machine) OnRemove() {
-        for id, _ := range m.sessionTbl {
-                m.DelSession(id)
-        }
 }
 
 type Machines struct {
@@ -87,7 +104,6 @@ type Machines struct {
 func (m *Machines) Add(nick string, conn net.Conn) {
         m.Lock()
         _m := &Machine{Group:m.Name, Nick:nick, conn:conn}
-        _m.Init()
         m.Tbl[nick] = _m
         m.Unlock()
 }
@@ -113,10 +129,6 @@ func (m *Machines) GetAll() []*Machine {
         return t
 }
 func (m *Machines) Del(nick string) {
-        _m := m.Get(nick)
-        if _m != nil {
-                _m.OnRemove()
-        }
         m.Lock()
         delete(m.Tbl, nick)
         m.Unlock()
@@ -174,7 +186,7 @@ type buttonConfig struct {
 var LuaActionTbl map[string](map[string]*buttonConfig)
 func Init() {
 	ClientTbl = &ClientTblT{}
-	ClientTbl.tbl = make(map[*websocket.Conn]bool)
+	ClientTbl.tbl = make(map[*websocket.Conn]*sessionInfo)
         RemoteTbl  = &RemoteTblT{Tbl:make(map[string]*Machines), conntbl:make(map[net.Conn]*Machine)}
 	flag.Parse()
         er:=InitAdminPort(*webservice)

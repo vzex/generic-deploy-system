@@ -153,6 +153,8 @@ func split(data []byte, atEOF bool, conn *websocket.Conn, callback ReadCallBack)
 }
 
 func ClickAction(file string, conn *websocket.Conn) {
+        client := ClientTbl.Get(conn)
+        if client == nil {return}
 	ar := strings.Split(file, ":")
 	if len(ar) != 2 {return}
 	f, m := ar[0], ar[1]
@@ -165,7 +167,7 @@ func ClickAction(file string, conn *websocket.Conn) {
 		return
 	}
 	ca:= func(ma *Machine) {
-                session := ma.AddSession()
+                session := client.AddSession()
 		l := lua.NewState()
 		l.OpenLibs()
 		l.SetGlobal("MachineGroup", lua.LString(group))
@@ -179,7 +181,7 @@ func ClickAction(file string, conn *websocket.Conn) {
 		})
 		common.RegLuaFunc(l, "SendToRemote", func(l *lua.LState) int {
 			id := genId()
-			return SendToRemote(id, session.quitC, ma, l)
+			return SendToRemote(id, session.id, session.quitC, ma, l)
 		})
 		if err := l.DoFile("logic/internal/init.lua"); err != nil {
                         log.Println("call init file fail:", err.Error())
@@ -192,7 +194,7 @@ func ClickAction(file string, conn *websocket.Conn) {
                         log.Println("call logic file fail:", _err.Error())
 			WSWrite(conn, []byte("error"), []byte(_err.Error()))
 		}
-                ma.DelSession(session.id)
+                client.DelSession(session.id)
 	}
 	if m == "all" {
 		t := ms.GetAll()
@@ -209,12 +211,12 @@ func ClickAction(file string, conn *websocket.Conn) {
 }
 
 //-------------------------
-func SendToRemote(requestid int, sessionQuit chan bool, ma *Machine, l *lua.LState) int {
+func SendToRemote(requestid, sessionid int, sessionQuit chan bool, ma *Machine, l *lua.LState) int {
 	s := l.CheckString(1)
 	sec := l.CheckInt(2)
 	c:=make(chan responseT)
 	requestMgr.AddRequest(&requestT{id:requestid, m:ma,waitC:c, closeC:make(chan bool)})
-	k:=&pipe.RequestCmd{uint(requestid), s}
+	k:=&pipe.RequestCmd{sessionid, uint(requestid), s}
 	pipe.Send(ma.conn, pipe.Request, k)
 	t:=time.NewTicker(time.Second*time.Duration(sec))
 	defer requestMgr.RemoveRequest(requestid)

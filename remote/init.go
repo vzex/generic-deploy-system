@@ -43,6 +43,9 @@ func Init() {
 
 //todo , save to table, for cancel
 func handleRequest(s pipe.RequestCmd, conn net.Conn) {
+        id := s.SessionId
+        g_SessionTbl[id] = &sessionInfo{make(chan bool)}
+
 	l := lua.NewState()
 	l.OpenLibs()
         common.InitCommon(l)
