@@ -41,6 +41,7 @@ func Init() {
 	}
 }
 
+//todo , save to table, for cancel
 func handleRequest(s pipe.RequestCmd, conn net.Conn) {
 	l := lua.NewState()
 	l.OpenLibs()
