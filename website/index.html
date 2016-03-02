@@ -228,9 +228,24 @@ function processMsg(head, msg) {
 				s+="<a href=\"javascript:clickbutton('"+b+"');\" class=\"sui-btn\">"+decodeURI(obj[b].Name)+"</a>";
 			}
 			document.getElementById("buttons").innerHTML=s;
+                        break;
+                case "output":
+                        $.confirm({
+                        body: msg
+                        ,width: 'normal'
+                        ,backdrop: true
+                        ,bgcolor: 'none'
+                        /*,hide: function(){console.log('hide')}
+                        ,hidden: function(){console.log('hiden')}
+                        ,okHide: function(){var a=confirm('true or false');if(!a) return false}
+                        ,okHidden: function(){console.log('okHidden')}
+                        ,cancelHide: function(){console.log('cancelHide')}
+                        ,cancelHidden: function(){console.log('cancelHidden')}*/
+                        })
+                        break;
 
-	}
-}
-</script>
-</body>
+                        }
+                        }
+                </script>
+        </body>
 </html>

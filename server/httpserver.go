@@ -16,7 +16,6 @@ import "../common"
 
 
 var currId int = 0
-var currId2 int = 0
 var genIdLock sync.RWMutex
 func genId() int {
 	genIdLock.Lock()
@@ -166,15 +165,21 @@ func ClickAction(file string, conn *websocket.Conn) {
 		return
 	}
 	ca:= func(ma *Machine) {
+                session := ma.AddSession()
 		l := lua.NewState()
 		l.OpenLibs()
 		l.SetGlobal("MachineGroup", lua.LString(group))
 		l.SetGlobal("MachineName", lua.LString(ma.Nick))
 		l.SetGlobal("MachineAddr", lua.LString(ma.conn.RemoteAddr().String()))
                 common.InitCommon(l)
+		common.RegLuaFunc(l, "SendToLocal", func(l *lua.LState) int {
+                        s := l.CheckString(1)
+			WSWrite(conn, []byte("output"), []byte(s))
+                        return 0
+		})
 		common.RegLuaFunc(l, "SendToRemote", func(l *lua.LState) int {
 			id := genId()
-			return SendToRemote(id, ma, l)
+			return SendToRemote(id, session.quitC, ma, l)
 		})
 		if err := l.DoFile("logic/internal/init.lua"); err != nil {
                         log.Println("call init file fail:", err.Error())
@@ -187,6 +192,7 @@ func ClickAction(file string, conn *websocket.Conn) {
                         log.Println("call logic file fail:", _err.Error())
 			WSWrite(conn, []byte("error"), []byte(_err.Error()))
 		}
+                ma.DelSession(session.id)
 	}
 	if m == "all" {
 		t := ms.GetAll()
@@ -203,7 +209,7 @@ func ClickAction(file string, conn *websocket.Conn) {
 }
 
 //-------------------------
-func SendToRemote(requestid int, ma *Machine, l *lua.LState) int {
+func SendToRemote(requestid int, sessionQuit chan bool, ma *Machine, l *lua.LState) int {
 	s := l.CheckString(1)
 	sec := l.CheckInt(2)
 	c:=make(chan responseT)
@@ -230,6 +236,8 @@ func SendToRemote(requestid int, ma *Machine, l *lua.LState) int {
 			}
 		case <-t.C:
 			return 0
+                case <-sessionQuit:
+                        return 0
 		}
 	}
 }

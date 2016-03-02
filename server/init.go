@@ -37,11 +37,48 @@ func (c *ClientTblT) Del(conn *websocket.Conn) {
         c.Unlock()
 }
 
+type sessionInfo struct {
+        quitC chan bool
+        id int
+}
+
 type Machine struct {
         Group string
         Nick string
         conn net.Conn
+        sessionTbl map[int]*sessionInfo
+        sessionLock sync.RWMutex
 }
+
+func (m *Machine) Init() {
+        m.sessionTbl = make(map[int]*sessionInfo)
+}
+
+func (m *Machine) AddSession() *sessionInfo {
+        id := genId()
+        s := &sessionInfo{make(chan bool), id}
+        m.sessionLock.Lock()
+        m.sessionTbl[id] = s
+        m.sessionLock.Unlock()
+        return s
+}
+
+func (m *Machine) DelSession(id int) {
+        m.sessionLock.Lock()
+        s, b := m.sessionTbl[id]
+        if b {
+                close(s.quitC)
+                delete(m.sessionTbl, id)
+        }
+        m.sessionLock.Unlock()
+}
+
+func (m *Machine) OnRemove() {
+        for id, _ := range m.sessionTbl {
+                m.DelSession(id)
+        }
+}
+
 type Machines struct {
         Name string
         Tbl map[string]*Machine
@@ -49,7 +86,9 @@ type Machines struct {
 }
 func (m *Machines) Add(nick string, conn net.Conn) {
         m.Lock()
-        m.Tbl[nick] = &Machine{m.Name, nick, conn}
+        _m := &Machine{Group:m.Name, Nick:nick, conn:conn}
+        _m.Init()
+        m.Tbl[nick] = _m
         m.Unlock()
 }
 func (m *Machines) Empty() bool {
@@ -74,6 +113,10 @@ func (m *Machines) GetAll() []*Machine {
         return t
 }
 func (m *Machines) Del(nick string) {
+        _m := m.Get(nick)
+        if _m != nil {
+                _m.OnRemove()
+        }
         m.Lock()
         delete(m.Tbl, nick)
         m.Unlock()
