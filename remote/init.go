@@ -2,6 +2,7 @@ package remote
 import "flag"
 import "log"
 import "net"
+import "sync"
 import "../pipe"
 import "github.com/yuin/gopher-lua"
 import "../common"
@@ -9,7 +10,42 @@ import "../common"
 var service = flag.String("service", "127.0.0.1:8888", "")
 var groupName = flag.String("group", "", "")
 var nickName = flag.String("nick", "", "")
+
+type sessionInfo struct {
+        quitC chan bool
+}
+
+type SessionMgr struct {
+        tbl map[int]*sessionInfo
+        sync.RWMutex
+}
+
+func (s *SessionMgr) AddSession(id int) *sessionInfo {
+        s.Lock()
+        session := &sessionInfo{make(chan bool)}
+        s.tbl[id] = session
+        s.Unlock()
+        return session
+}
+func (s *SessionMgr) GetSession(id int) *sessionInfo {
+        s.RLock()
+        session, _ := s.tbl[id]
+        s.RUnlock()
+        return session
+}
+func (s *SessionMgr) DelSession(id int) {
+        session := s.GetSession(id)
+        if session != nil {
+                close(session.quitC)
+        }
+        s.Lock()
+        delete(s.tbl, id)
+        s.Unlock()
+}
+var g_SessionTbl *SessionMgr
+
 func Init() {
+        g_SessionTbl = &SessionMgr{tbl:make(map[int]*sessionInfo)}
 	flag.Parse()
 	println("remote init")
         c:=make(chan *pipe.HelperInfo)
@@ -43,19 +79,19 @@ func Init() {
 
 //todo , save to table, for cancel
 func handleRequest(s pipe.RequestCmd, conn net.Conn) {
-        id := s.SessionId
-        g_SessionTbl[id] = &sessionInfo{make(chan bool)}
+        sessionid := s.SessionId
+        session := g_SessionTbl.AddSession(sessionid)
 
 	l := lua.NewState()
 	l.OpenLibs()
-        common.InitCommon(l)
+        common.InitCommon(l, session.quitC)
 	if err := l.DoFile("logic_remote/internal/init.lua"); err != nil {
 		log.Println(err.Error())
 		return //todo
 	}
 	l.SetGlobal("MsgPack", l.Get(-1))
 	l.Pop(1)
-	id := s.Id
+	id := int(s.Id)
 	common.RegLuaFunc(l, "SendBack", func(l *lua.LState) int {
 		return SendBack(int(id), l, conn, "recv")
 	})
@@ -84,6 +120,7 @@ func handleRequest(s pipe.RequestCmd, conn net.Conn) {
         l.SetTop(0)
         l.Push(lua.LString(""))
 	SendBack(int(id), l, conn, "end")
+        g_SessionTbl.DelSession(sessionid)
 }
 
 func SendBack(requestid int, l *lua.LState, conn net.Conn, t string) int {

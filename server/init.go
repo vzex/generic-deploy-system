@@ -66,7 +66,7 @@ func (c *ClientTblT) Broadcast(head, b []byte) {
         c.RUnlock()
         log.Println("end Broadcast");
 }
-func (c *ClientTblT) Add(conn *websocket.Conn) *sessionInfo {
+func (c *ClientTblT) Add(conn *websocket.Conn) *ClientT{
         c.Lock()
         client := &ClientT{}
         client.Init()
@@ -74,7 +74,7 @@ func (c *ClientTblT) Add(conn *websocket.Conn) *sessionInfo {
         c.Unlock()
         return client
 }
-func (c *ClientTblT) Get(conn *websocket.Conn) *sessionInfo {
+func (c *ClientTblT) Get(conn *websocket.Conn) *ClientT{
         c.RLock()
         _m, _ := c.tbl[conn]
         c.RUnlock()
@@ -186,7 +186,7 @@ type buttonConfig struct {
 var LuaActionTbl map[string](map[string]*buttonConfig)
 func Init() {
 	ClientTbl = &ClientTblT{}
-	ClientTbl.tbl = make(map[*websocket.Conn]*sessionInfo)
+	ClientTbl.tbl = make(map[*websocket.Conn]*ClientT)
         RemoteTbl  = &RemoteTblT{Tbl:make(map[string]*Machines), conntbl:make(map[net.Conn]*Machine)}
 	flag.Parse()
         er:=InitAdminPort(*webservice)

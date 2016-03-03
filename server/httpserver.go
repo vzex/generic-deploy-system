@@ -173,7 +173,7 @@ func ClickAction(file string, conn *websocket.Conn) {
 		l.SetGlobal("MachineGroup", lua.LString(group))
 		l.SetGlobal("MachineName", lua.LString(ma.Nick))
 		l.SetGlobal("MachineAddr", lua.LString(ma.conn.RemoteAddr().String()))
-                common.InitCommon(l)
+                common.InitCommon(l, session.quitC)
 		common.RegLuaFunc(l, "SendToLocal", func(l *lua.LState) int {
                         s := l.CheckString(1)
 			WSWrite(conn, []byte("output"), []byte(s))
