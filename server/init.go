@@ -54,8 +54,35 @@ func (c *ClientT) OnRemove() {
 
 type ClientTblT struct {
 	tbl map[*websocket.Conn]*ClientT
+	action2Session map[string]int
+	actionLock sync.RWMutex
 	sync.RWMutex
 }
+
+func (c *ClientTblT) AddAction(action string) {
+	c.actionLock.Lock()
+	n, _ := c.action2Session[action]
+	c.action2Session[action] = n + 1
+	c.actionLock.Unlock()
+}
+
+func (c *ClientTblT) RemoveAction(action string) {
+	c.actionLock.Lock()
+	n, _ := c.action2Session[action]
+	c.action2Session[action] = n - 1
+	if n <= 0 {
+		delete(c.action2Session, action)
+	}
+	c.actionLock.Unlock()
+}
+
+func (c *ClientTblT) HasActionSession(action string) int {
+        c.actionLock.RLock()
+	n, _ := c.action2Session[action]
+        c.actionLock.RUnlock()
+	return n
+}
+
 
 func (c *ClientTblT) Broadcast(head, b []byte) {
         log.Println("begin Broadcast");
@@ -187,6 +214,7 @@ var LuaActionTbl map[string](map[string]*buttonConfig)
 func Init() {
 	ClientTbl = &ClientTblT{}
 	ClientTbl.tbl = make(map[*websocket.Conn]*ClientT)
+	ClientTbl.action2Session = make(map[string]int)
         RemoteTbl  = &RemoteTblT{Tbl:make(map[string]*Machines), conntbl:make(map[net.Conn]*Machine)}
 	flag.Parse()
         er:=InitAdminPort(*webservice)

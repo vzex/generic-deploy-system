@@ -167,7 +167,12 @@ func ClickAction(file string, conn *websocket.Conn) {
 		return
 	}
 	ca:= func(ma *Machine) {
+		action := group+":"+ma.Nick+":"+f
+		ClientTbl.AddAction(action)
+		defer ClientTbl.RemoveAction(action)
                 session := client.AddSession()
+		single := (ClientTbl.HasActionSession(action)<=1)
+                defer client.DelSession(session.id)
 		l := lua.NewState()
 		l.OpenLibs()
 		l.SetGlobal("MachineGroup", lua.LString(group))
@@ -183,6 +188,10 @@ func ClickAction(file string, conn *websocket.Conn) {
 			id := genId()
 			return SendToRemote(id, session.id, session.quitC, ma, l)
 		})
+		common.RegLuaFunc(l, "Single", func(l *lua.LState) int {
+			l.Push(lua.LBool(single))
+			return 1
+		})
 		if err := l.DoFile("logic/internal/init.lua"); err != nil {
                         log.Println("call init file fail:", err.Error())
 			WSWrite(conn, []byte("error"), []byte(err.Error()))
@@ -194,7 +203,6 @@ func ClickAction(file string, conn *websocket.Conn) {
                         log.Println("call logic file fail:", _err.Error())
 			WSWrite(conn, []byte("error"), []byte(_err.Error()))
 		}
-                client.DelSession(session.id)
 	}
 	if m == "all" {
 		t := ms.GetAll()
@@ -226,7 +234,7 @@ func SendToRemote(requestid, sessionid int, sessionQuit chan bool, ma *Machine, 
 			switch info.head {
 			case "recv":
 				msg:=info.msg
-				if l.CheckFunction(3) != nil {
+				if l.Get(3).Type() == lua.LTFunction {
 					l.Push(lua.LString(msg))
 					if e := l.PCall(1, 0, nil); e !=nil {
 						log.Println(e.Error())

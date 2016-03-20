@@ -1,6 +1,7 @@
 if bInit then
         return {name="测试1"}
 end
+if not Single() then return end
 --single() check lock, is locked quit
 --remote_cmd("ls -l", function(status, recv)
 --	print(status, recv)
@@ -25,11 +26,12 @@ end
 --sleep(10)
 --
 
-local endStr = remote_cmd("ls -l", function(aa) 
+remote_cmd("sleep 1", function() end)
+local endStr = remote_cmd("ls -r", function(aa) 
 	local tbl = MsgPack.unpack(aa)
 	for a,b in pairs(tbl) do 
                 if type(b) == "string" then
-                        SendToLocal(b)
+                        local_msg(b)
                 end
         end
 end)
