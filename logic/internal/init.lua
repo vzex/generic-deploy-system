@@ -4,6 +4,9 @@ json = require "logic/internal/json"
 function remote_cmd(cmd, callback, timeout)
 	return SendToRemote(MsgPack.pack({Action="cmd", Cmd=cmd}), timeout or 10, callback)
 end
+function remote_bash(cmd, callback, timeout)
+	return SendToRemote(MsgPack.pack({Action="bash", Cmd=cmd}), timeout or 10, callback)
+end
 function local_msg(msg)
 	return SendToLocal(json.encode({Action="msg", Msg=msg}))
 end

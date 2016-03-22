@@ -15,6 +15,7 @@ func RegLuaFuncWithCancel(l *lua.LState, name string, f func(l *lua.LState, sess
 }
 func InitCommon(l *lua.LState, sessionQuitC chan bool) {
         RegLuaFuncWithCancel(l, "cmd", cmd, sessionQuitC)
+        RegLuaFuncWithCancel(l, "bash", bash, sessionQuitC)
 }
 
 func cmd(l *lua.LState, sessionQuitC chan bool) int {
@@ -32,5 +33,17 @@ func cmd(l *lua.LState, sessionQuitC chan bool) int {
                 l.Push(lua.LString(""))
                 l.Push(lua.LBool(false))
         }
+        return 2
+}
+
+func bash(l *lua.LState, sessionQuitC chan bool) int {
+        c := l.CheckString(1)
+        out, err := exec.Command("/bin/bash", "-c", c).CombinedOutput()
+        bok := true
+        if err != nil {
+                bok = false
+        }
+        l.Push(lua.LString(out))
+        l.Push(lua.LBool(bok))
         return 2
 }

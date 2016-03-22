@@ -4,4 +4,9 @@ function handle_cmd(info)
         local s, ok = cmd(commond)
         SendBack(MsgPack.pack({str=s, ok = ok}))
 end
+function handle_bash(info)
+        local commond = info.Cmd
+        local s, ok = bash(commond)
+        SendBack(MsgPack.pack({str=s, ok = ok}))
+end
 return m
