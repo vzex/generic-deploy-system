@@ -16,17 +16,39 @@ func RegLuaFuncWithCancel(l *lua.LState, name string, f func(l *lua.LState, sess
 func InitCommon(l *lua.LState, sessionQuitC chan bool) {
         RegLuaFuncWithCancel(l, "cmd", cmd, sessionQuitC)
         RegLuaFuncWithCancel(l, "bash", bash, sessionQuitC)
+        RegLuaFuncWithCancel(l, "quit", quit, sessionQuitC)
+}
+
+func quit(l *lua.LState, sessionQuitC chan bool) int {
+	close(sessionQuitC)
+	return 0
 }
 
 func cmd(l *lua.LState, sessionQuitC chan bool) int {
         c := l.CheckString(1)
         arr:=strings.Split(c, " ")
         if len(arr) > 0 {
-                out, err := exec.Command(arr[0], arr[1:]...).CombinedOutput()
-                bok := true
-                if err != nil {
-                        bok = false
-                }
+		out := ""
+		ch:=make(chan string)
+		bok := true
+		cmd := exec.Command(arr[0], arr[1:]...)
+		go func() {
+			msg, err := cmd.CombinedOutput()
+			if err != nil {
+				bok = false
+			}
+			select {
+			case ch<-string(msg):
+			case <-sessionQuitC:
+			}
+		}()
+		select {
+		case out = <-ch:
+		case <-sessionQuitC:
+			if cmd.Process!=nil {
+				cmd.Process.Kill()
+			}
+		}
                 l.Push(lua.LString(out))
                 l.Push(lua.LBool(bok))
         } else {
@@ -38,11 +60,27 @@ func cmd(l *lua.LState, sessionQuitC chan bool) int {
 
 func bash(l *lua.LState, sessionQuitC chan bool) int {
         c := l.CheckString(1)
-        out, err := exec.Command("/bin/bash", "-c", c).CombinedOutput()
-        bok := true
-        if err != nil {
-                bok = false
-        }
+	out := ""
+	ch:=make(chan string)
+	bok := true
+        cmd := exec.Command("/bin/bash", "-c", c)
+	go func() {
+		msg, err := cmd.CombinedOutput()
+		if err != nil {
+			bok = false
+		}
+		select {
+		case ch<-string(msg):
+		case <-sessionQuitC:
+		}
+	}()
+	select {
+	case out = <-ch:
+	case <-sessionQuitC:
+		if cmd.Process!=nil {
+			cmd.Process.Kill()
+		}
+	}
         l.Push(lua.LString(out))
         l.Push(lua.LBool(bok))
         return 2

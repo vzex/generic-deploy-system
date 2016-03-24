@@ -38,9 +38,8 @@ func (c *ClientT) AddSession() *sessionInfo {
 
 func (c *ClientT) DelSession(id int) {
         c.sessionLock.Lock()
-        s, b := c.sessionTbl[id]
+        _, b := c.sessionTbl[id]
         if b {
-                close(s.quitC)
                 delete(c.sessionTbl, id)
         }
         c.sessionLock.Unlock()
