@@ -17,6 +17,10 @@
     可自行扩展功能，扩展功能也无需重新编译二进制程序，所有内置功能均以lua脚本实现
     
     每个按钮每次点击均运行在独立线程，不会阻塞系统运行
+    
+    按钮请求中的命令可立即被终止
+    
+    支持按钮单例模式，即没有返回结果以前，不可再次点击该按钮
   
 概念：
 
@@ -30,3 +34,15 @@
   
   
   
+测试：
+    make remote server
+    group1 包含三台机器 aaa bbb ccc
+    
+    ./run_server
+    ./run_remote -group group1 -nick aaa
+    ./run_remote -group group1 -nick bbb
+    ./run_remote -group group1 -nick ccc
+    
+    页面上进行点击操作查看效果
+    按钮1，sleep 2s，执行ls -l返回给浏览器 单例模式 允许请求中再次点击按钮终止操作
+    按钮2，支持远程命令组合
