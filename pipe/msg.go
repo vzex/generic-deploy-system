@@ -9,6 +9,7 @@ const (
         Request
         Response
 	RegRemote
+        CancelRequest
 )
 
 type RemoteInfo struct {

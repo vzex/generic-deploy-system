@@ -11,4 +11,3 @@ local endStr = remote_bash("ls -r|wc -l", function(aa)
                 end
         end
 end)
-quit()

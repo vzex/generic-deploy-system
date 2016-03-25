@@ -16,12 +16,6 @@ func RegLuaFuncWithCancel(l *lua.LState, name string, f func(l *lua.LState, sess
 func InitCommon(l *lua.LState, sessionQuitC chan bool) {
         RegLuaFuncWithCancel(l, "cmd", cmd, sessionQuitC)
         RegLuaFuncWithCancel(l, "bash", bash, sessionQuitC)
-        RegLuaFuncWithCancel(l, "quit", quit, sessionQuitC)
-}
-
-func quit(l *lua.LState, sessionQuitC chan bool) int {
-	close(sessionQuitC)
-	return 0
 }
 
 func cmd(l *lua.LState, sessionQuitC chan bool) int {

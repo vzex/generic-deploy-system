@@ -182,6 +182,19 @@ function clicktab(group) {
 	Send(socket, "opengroup", group);
 }
 function clickbutton(name) {
+        if (document.getElementById("btn"+name).dataset.status=="lock") {
+                $.confirm({
+                body: "do you want cancel?"
+                ,width: 'normal'
+                ,backdrop: true
+                ,bgcolor: 'none'
+                ,okHide: function(){
+                console.log(document.getElementById("btn"+name).dataset.session);
+                Send(socket, "cancel", document.getElementById("btn"+name).dataset.session)
+                }
+                })
+                return;
+        }
 	var m = document.getElementById("nicklist").value;
 	Send(socket, "click", lastSel+"/"+name + ":" + m)
 }
@@ -225,12 +238,26 @@ function processMsg(head, msg) {
 			var obj = jQuery.parseJSON(msg);
 			var s = "";
 			for(var b in obj) {
-				s+="<a href=\"javascript:clickbutton('"+b+"');\" class=\"sui-btn\">"+decodeURI(obj[b].Name)+"</a>";
+                                var name = decodeURI(obj[b].Name);
+				s+="<a href=\"javascript:clickbutton('"+b+"');\" class=\"sui-btn\" data-status=\"normal\" data-session=\"\" data-name=\""+name+"\" id=\"btn"+b+"\">"+name+"</a>";
 			}
 			document.getElementById("buttons").innerHTML=s;
                         break;
-                case "output":
+                case "lock":
 			console.log(msg);
+			var obj = jQuery.parseJSON(msg);
+			console.log(obj);
+                        var b = document.getElementById("btn"+obj[0]);
+			b.dataset.status="lock";
+			b.dataset.session=obj[1];
+			b.innerHTML="waiting";
+                        break;
+                case "unlock":
+                        var b = document.getElementById("btn"+msg);
+			b.dataset.status="normal";
+			b.innerHTML=b.dataset.name;
+                        break;
+                case "output":
 			var obj = jQuery.parseJSON(msg);
 			console.log(obj);
 

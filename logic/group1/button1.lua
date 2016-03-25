@@ -26,7 +26,7 @@ if not Single() then return end
 --sleep(10)
 --
 
-remote_cmd("sleep 1", function() end)
+remote_cmd("sleep 2", function() end)
 local endStr = remote_cmd("ls -r", function(aa) 
 	local tbl = MsgPack.unpack(aa)
 	for a,b in pairs(tbl) do 

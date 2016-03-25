@@ -4,6 +4,7 @@ import "flag"
 import "log"
 import "net"
 import "net/url"
+import "../pipe"
 import "os"
 import "golang.org/x/net/websocket"
 import "sync"
@@ -14,8 +15,10 @@ var service = flag.String("service", "127.0.0.1:8888", "for remote client connec
 var webservice = flag.String("web", "127.0.0.1:8080", "http server port")
 
 type sessionInfo struct {
+        conn net.Conn
         quitC chan bool
         id int
+        client *ClientT
 }
 
 type ClientT struct {
@@ -27,9 +30,9 @@ func (c *ClientT) Init() {
         c.sessionTbl = make(map[int]*sessionInfo)
 }
 
-func (c *ClientT) AddSession() *sessionInfo {
+func (c *ClientT) AddSession(conn net.Conn) *sessionInfo {
         id := genId()
-        s := &sessionInfo{make(chan bool), id}
+        s := &sessionInfo{conn, make(chan bool), id, c}
         c.sessionLock.Lock()
         c.sessionTbl[id] = s
         c.sessionLock.Unlock()
@@ -38,8 +41,9 @@ func (c *ClientT) AddSession() *sessionInfo {
 
 func (c *ClientT) DelSession(id int) {
         c.sessionLock.Lock()
-        _, b := c.sessionTbl[id]
+        s, b := c.sessionTbl[id]
         if b {
+                close(s.quitC)
                 delete(c.sessionTbl, id)
         }
         c.sessionLock.Unlock()
@@ -53,31 +57,54 @@ func (c *ClientT) OnRemove() {
 
 type ClientTblT struct {
 	tbl map[*websocket.Conn]*ClientT
-	action2Session map[string]int
+	action2Session map[string](map[*sessionInfo]bool)
 	actionLock sync.RWMutex
 	sync.RWMutex
 }
 
-func (c *ClientTblT) AddAction(action string) {
+func (c *ClientTblT) CancelAction(action string) {
+	c.actionLock.RLock()
+	tbl, b := c.action2Session[action]
+        if b {
+                for session, _ := range tbl {
+                        log.Println("cancel", action, session.id)
+                        pipe.Send(session.conn, pipe.CancelRequest, pipe.RequestCmd{session.id, uint(0), ""})
+                        session.client.DelSession(session.id)
+                }
+        }
+	c.actionLock.RUnlock()
+}
+
+func (c *ClientTblT) AddAction(action string, session *sessionInfo) {
 	c.actionLock.Lock()
-	n, _ := c.action2Session[action]
-	c.action2Session[action] = n + 1
+	tbl, b := c.action2Session[action]
+        if !b {
+                tbl = make(map[*sessionInfo]bool)
+                c.action2Session[action] = tbl
+        }
+        tbl[session] = true
 	c.actionLock.Unlock()
 }
 
-func (c *ClientTblT) RemoveAction(action string) {
+func (c *ClientTblT) RemoveAction(action string, session *sessionInfo) {
 	c.actionLock.Lock()
-	n, _ := c.action2Session[action]
-	c.action2Session[action] = n - 1
-	if n <= 0 {
+	tbl, b := c.action2Session[action]
+        if b {
+                delete(tbl, session)
+        }
+	if b && len(tbl) <= 0 {
 		delete(c.action2Session, action)
 	}
 	c.actionLock.Unlock()
 }
 
 func (c *ClientTblT) HasActionSession(action string) int {
+        n := 0
         c.actionLock.RLock()
-	n, _ := c.action2Session[action]
+	tbl, b := c.action2Session[action]
+        if b {
+                n = len(tbl)
+        }
         c.actionLock.RUnlock()
 	return n
 }
@@ -213,7 +240,7 @@ var LuaActionTbl map[string](map[string]*buttonConfig)
 func Init() {
 	ClientTbl = &ClientTblT{}
 	ClientTbl.tbl = make(map[*websocket.Conn]*ClientT)
-	ClientTbl.action2Session = make(map[string]int)
+	ClientTbl.action2Session = make(map[string](map[*sessionInfo]bool))
         RemoteTbl  = &RemoteTblT{Tbl:make(map[string]*Machines), conntbl:make(map[net.Conn]*Machine)}
 	flag.Parse()
         er:=InitAdminPort(*webservice)

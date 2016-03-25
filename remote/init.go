@@ -12,18 +12,26 @@ var groupName = flag.String("group", "", "")
 var nickName = flag.String("nick", "", "")
 
 type sessionInfo struct {
+        sessionId int
         quitC chan bool
 }
 
 type SessionMgr struct {
         tbl map[int]*sessionInfo
+        sessiontbl map[int](map[int]bool)
         sync.RWMutex
 }
 
-func (s *SessionMgr) AddSession(id int) *sessionInfo {
+func (s *SessionMgr) AddSession(id, sessionId int) *sessionInfo {
         s.Lock()
-        session := &sessionInfo{make(chan bool)}
+        session := &sessionInfo{sessionId, make(chan bool)}
         s.tbl[id] = session
+        ss, b := s.sessiontbl[sessionId]
+        if !b {
+                ss = make(map[int]bool)
+                s.sessiontbl[sessionId] = ss
+        }
+        ss[id] = true
         s.Unlock()
         return session
 }
@@ -35,17 +43,43 @@ func (s *SessionMgr) GetSession(id int) *sessionInfo {
 }
 func (s *SessionMgr) DelSession(id int) {
         session := s.GetSession(id)
+        s.Lock()
         if session != nil {
+                sid := session.sessionId
+                ss, b := s.sessiontbl[sid]
+                if b {
+                        delete(ss, id)
+                        if len(ss) == 0 {
+                                delete(s.sessiontbl, sid)
+                        }
+                }
                 close(session.quitC)
         }
-        s.Lock()
         delete(s.tbl, id)
         s.Unlock()
 }
+
+func (s *SessionMgr) CancelSession(sessionId int) {
+        s.Lock()
+        ss, b := s.sessiontbl[sessionId]
+        if b {
+                for id, _ := range ss {
+                        session, _b := s.tbl[id]
+                        if _b {
+                                delete(s.tbl, id)
+                                close(session.quitC)
+                                log.Println("cancel request", id)
+                        }
+                }
+                delete(s.sessiontbl, sessionId)
+        }
+        s.Unlock()
+}
+
 var g_SessionTbl *SessionMgr
 
 func Init() {
-        g_SessionTbl = &SessionMgr{tbl:make(map[int]*sessionInfo)}
+        g_SessionTbl = &SessionMgr{tbl:make(map[int]*sessionInfo), sessiontbl:make(map[int](map[int]bool))}
 	flag.Parse()
 	println("remote init")
         c:=make(chan *pipe.HelperInfo)
@@ -61,6 +95,12 @@ func Init() {
 					var s pipe.RequestCmd
 					pipe.DecodeBytes(info.Bytes, &s)
 					go handleRequest(s, info.Conn)
+                                case pipe.CancelRequest:
+					var s pipe.RequestCmd
+					pipe.DecodeBytes(info.Bytes, &s)
+                                        log.Println("CancelSession", s.SessionId)
+					go g_SessionTbl.CancelSession(s.SessionId)
+
                                 }
                         }
                 }
@@ -77,10 +117,9 @@ func Init() {
 	}
 }
 
-//todo , save to table, for cancel
 func handleRequest(s pipe.RequestCmd, conn net.Conn) {
-        sessionid := s.SessionId
-        session := g_SessionTbl.AddSession(sessionid)
+	id := int(s.Id)
+        session := g_SessionTbl.AddSession(id, s.SessionId)
 
 	l := lua.NewState()
 	l.OpenLibs()
@@ -91,7 +130,6 @@ func handleRequest(s pipe.RequestCmd, conn net.Conn) {
 	}
 	l.SetGlobal("MsgPack", l.Get(-1))
 	l.Pop(1)
-	id := int(s.Id)
 	common.RegLuaFunc(l, "SendBack", func(l *lua.LState) int {
 		return SendBack(int(id), l, conn, "recv")
 	})
@@ -120,7 +158,7 @@ func handleRequest(s pipe.RequestCmd, conn net.Conn) {
         l.SetTop(0)
         l.Push(lua.LString(""))
 	SendBack(int(id), l, conn, "end")
-        g_SessionTbl.DelSession(sessionid)
+        g_SessionTbl.DelSession(id)
 }
 
 func SendBack(requestid int, l *lua.LState, conn net.Conn, t string) int {

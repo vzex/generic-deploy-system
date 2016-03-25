@@ -166,13 +166,18 @@ func ClickAction(file string, conn *websocket.Conn) {
 	if ms ==nil {
 		return
 	}
+        totalN := 0
+        waitC := make(chan bool)
+        action := group+":"+m+":"+f
 	ca:= func(ma *Machine) {
-		action := group+":"+ma.Nick+":"+f
-		ClientTbl.AddAction(action)
-		defer ClientTbl.RemoveAction(action)
-                session := client.AddSession()
-		single := (ClientTbl.HasActionSession(action)<=1)
+                defer func() {
+                        waitC<-true
+                } ()
+                session := client.AddSession(ma.conn)
+		single := (ClientTbl.HasActionSession(action)<=0)
                 defer client.DelSession(session.id)
+		ClientTbl.AddAction(action, session)
+		defer ClientTbl.RemoveAction(action, session)
 		l := lua.NewState()
 		l.OpenLibs()
 		l.SetGlobal("MachineGroup", lua.LString(group))
@@ -207,15 +212,32 @@ func ClickAction(file string, conn *websocket.Conn) {
 	if m == "all" {
 		t := ms.GetAll()
 		for _, machine := range t {
+                        totalN += 1
 			go ca(machine)
 		}
 	} else {
+                totalN = 1
 		machine := ms.Get(m)
 		if machine == nil {
 			return
 		}
 		go ca(machine)
 	}
+        if totalN > 0 {
+                name := _ar[1]
+                b, _ := json.Marshal([]string{name, action})
+                WSWrite(conn, []byte("lock"), []byte(b))
+                defer WSWrite(conn, []byte("unlock"), []byte(name))
+                for {
+                        select {
+                        case <- waitC:
+                                totalN -= 1
+                                if totalN <= 0 {
+                                        return
+                                }
+                        }
+                }
+        }
 }
 
 //-------------------------
@@ -269,6 +291,8 @@ func ClientReadCallBack(conn *websocket.Conn, head string, arg []byte) {
 		}
 	case "click":
 		go ClickAction(string(arg), conn)
+        case "cancel":
+		ClientTbl.CancelAction(string(arg))
 
        }
 }
