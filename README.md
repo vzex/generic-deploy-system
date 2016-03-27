@@ -35,14 +35,14 @@
   
   
 测试：
-    make remote server
-    group1 包含三台机器 aaa bbb ccc
+        make remote server
+        group1 包含三台机器 aaa bbb ccc
+        局域网内4台机器，ip分别为A(作为服务器，不被管理) B C D
+        A ./run_server
+        B ./run_remote -group group1 -nick aaa
+        C ./run_remote -group group1 -nick bbb
+        D ./run_remote -group group1 -nick ccc
     
-    ./run_server
-    ./run_remote -group group1 -nick aaa
-    ./run_remote -group group1 -nick bbb
-    ./run_remote -group group1 -nick ccc
-    
-    页面上进行点击操作查看效果
+    页面上进行点击操作查看效果 A:8080
     按钮1，sleep 2s，执行ls -l返回给浏览器 单例模式 允许请求中再次点击按钮终止操作
     按钮2，支持远程命令组合
