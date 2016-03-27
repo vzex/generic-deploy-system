@@ -235,6 +235,7 @@ var ClientTbl *ClientTblT
 var RemoteTbl *RemoteTblT
 type buttonConfig struct {
         Name string
+	MultiControl bool
 }
 var LuaActionTbl map[string](map[string]*buttonConfig)
 func Init() {
@@ -269,7 +270,7 @@ func ScanButtons() {
 						g = make(map[string]*buttonConfig)
 						LuaActionTbl[groupName] = g
 					}
-                                        config := &buttonConfig{Name:buttonName}
+					config := &buttonConfig{Name:buttonName, MultiControl:false}
                                         g[buttonName] = config
 					log.Println("find button:", groupName, buttonName)
                                         ls := lua.NewState()
@@ -284,6 +285,13 @@ func ScanButtons() {
                                                         config.Name = url.QueryEscape(string(s))
                                                         log.Println("name", s)
                                                 }
+                                                v = t.(*lua.LTable).RawGetString("multicontrol")
+						if v.Type() == lua.LTBool {
+							b, _ := v.(lua.LBool)
+							if b {
+								config.MultiControl = bool(b)
+							}
+						}
                                         }
 				}
 			}
