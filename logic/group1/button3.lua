@@ -8,4 +8,7 @@ RemoteDownToServer()
 ServerDownToLocal()
 
 SendToSpecRemote()
+Connect(ip, port, function(recv, status)
+	print(recv)
+end)
 --print("test over", endStr)
