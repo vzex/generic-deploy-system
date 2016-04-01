@@ -5,6 +5,7 @@ import "log"
 import "time"
 import "../pipe"
 import "bufio"
+import "io/ioutil"
 import "sync"
 import "encoding/binary"
 import "errors"
@@ -197,6 +198,10 @@ func ClickAction(file string, conn *websocket.Conn) {
 			l.Push(lua.LBool(single))
 			return 1
 		})
+		common.RegLuaFunc(l, "ServerUploadToRemote", func(l *lua.LState) int {
+			id := genId()
+			return ServerUploadToRemote(id, session.id, session.quitC, ma, l)
+		})
 		if err := l.DoFile("logic/internal/init.lua"); err != nil {
                         log.Println("call init file fail:", err.Error())
 			WSWrite(conn, []byte("error"), []byte(err.Error()))
@@ -241,6 +246,20 @@ func ClickAction(file string, conn *websocket.Conn) {
 }
 
 //-------------------------
+func ServerUploadToRemote(requestid, sessionid int, sessionQuit chan bool, ma *Machine, l *lua.LState) int {
+        from := l.CheckString(1)
+        to := l.CheckString(2)
+        b, err := ioutil.ReadFile(from)
+        if err != nil {
+                l.Push(lua.LString(err.Error()))
+        } else {
+                l.Push(lua.LNil)
+        }
+        t := &FileCmd{requestid, to, b}
+	pipe.Send(ma.conn, pipe.UploadFile, k)
+        return 2
+}
+
 func SendToRemote(requestid, sessionid int, sessionQuit chan bool, ma *Machine, l *lua.LState) int {
 	s := l.CheckString(1)
 	sec := l.CheckInt(2)

@@ -2,6 +2,7 @@ package remote
 import "flag"
 import "log"
 import "net"
+import "io/ioutil"
 import "sync"
 import "../pipe"
 import "github.com/yuin/gopher-lua"
@@ -100,6 +101,10 @@ func Init() {
 					pipe.DecodeBytes(info.Bytes, &s)
                                         log.Println("CancelSession", s.SessionId)
 					go g_SessionTbl.CancelSession(s.SessionId)
+                                case pipe.UploadFile:
+                                        var s pipe.FileCmd
+					pipe.DecodeBytes(info.Bytes, &s)
+                                        go writeFile(s)
 
                                 }
                         }
@@ -115,6 +120,10 @@ func Init() {
         } else {
 		log.Println("dial fail")
 	}
+}
+
+func writeFile(s pipe.FileCmd, conn net.Conn) {
+        er:=ioutil.WriteFile(s.Name, s.Data, 0777)
 }
 
 func handleRequest(s pipe.RequestCmd, conn net.Conn) {

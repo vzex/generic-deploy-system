@@ -10,6 +10,7 @@ const (
         Response
 	RegRemote
         CancelRequest
+        UploadFile
 )
 
 type RemoteInfo struct {
@@ -27,4 +28,16 @@ type ResponseCmd struct {
 	Id uint
 	Cmd string
 	Action string
+}
+
+type FileCmd struct {
+        Id int
+        Name string
+        Data []byte
+}
+
+type ResponseUploadFileCmd struct {
+        Id int
+        Name string
+        Data []byte
 }
