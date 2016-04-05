@@ -36,5 +36,4 @@ local endStr = remote_cmd("ls -r", function(aa)
         end
 end)
 
-upload()
 --print("test over", endStr)

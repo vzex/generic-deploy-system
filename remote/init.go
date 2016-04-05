@@ -104,7 +104,7 @@ func Init() {
                                 case pipe.UploadFile:
                                         var s pipe.FileCmd
 					pipe.DecodeBytes(info.Bytes, &s)
-                                        go writeFile(s)
+                                        go writeFile(s, info.Conn)
 
                                 }
                         }
@@ -124,6 +124,13 @@ func Init() {
 
 func writeFile(s pipe.FileCmd, conn net.Conn) {
         er:=ioutil.WriteFile(s.Name, s.Data, 0777)
+        var k *pipe.ResponseCmd
+        if er == nil {
+                k = &pipe.ResponseCmd{uint(s.Id), "", ""}
+        } else {
+                k = &pipe.ResponseCmd{uint(s.Id), er.Error(), ""}
+        }
+	pipe.Send(conn, pipe.Response, k)
 }
 
 func handleRequest(s pipe.RequestCmd, conn net.Conn) {

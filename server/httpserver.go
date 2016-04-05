@@ -255,9 +255,28 @@ func ServerUploadToRemote(requestid, sessionid int, sessionQuit chan bool, ma *M
         } else {
                 l.Push(lua.LNil)
         }
-        t := &FileCmd{requestid, to, b}
-	pipe.Send(ma.conn, pipe.UploadFile, k)
-        return 2
+        t := &pipe.FileCmd{requestid, to, b}
+	c:=make(chan responseT)
+	requestMgr.AddRequest(&requestT{id:requestid, m:ma,waitC:c, closeC:make(chan bool)})
+	defer requestMgr.RemoveRequest(requestid)
+	pipe.Send(ma.conn, pipe.UploadFile, t)
+	for {
+		select {
+		case info:= <- c:
+                        msg:=info.msg
+                        if l.Get(3).Type() == lua.LTFunction {
+                                l.Push(l.Get(3))
+                                l.Push(lua.LString(msg))
+                                if e := l.PCall(1, 0, nil); e !=nil {
+                                        log.Println(e.Error())
+                                }
+                        }
+                        return 1
+                case <-sessionQuit:
+                        return 0
+		}
+	}
+        return 0
 }
 
 func SendToRemote(requestid, sessionid int, sessionQuit chan bool, ma *Machine, l *lua.LState) int {
@@ -276,6 +295,7 @@ func SendToRemote(requestid, sessionid int, sessionQuit chan bool, ma *Machine, 
 			case "recv":
 				msg:=info.msg
 				if l.Get(3).Type() == lua.LTFunction {
+                                        l.Push(l.Get(3))
 					l.Push(lua.LString(msg))
 					if e := l.PCall(1, 0, nil); e !=nil {
 						log.Println(e.Error())
