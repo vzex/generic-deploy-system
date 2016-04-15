@@ -202,6 +202,10 @@ func ClickAction(file string, conn *websocket.Conn) {
 			id := genId()
 			return ServerUploadToRemote(id, session.id, session.quitC, ma, l)
 		})
+		common.RegLuaFunc(l, "ServerDownFromRemote", func(l *lua.LState) int {
+			id := genId()
+			return ServerDownFromRemote(id, session.id, session.quitC, ma, l)
+		})
 		if err := l.DoFile("logic/internal/init.lua"); err != nil {
                         log.Println("call init file fail:", err.Error())
 			WSWrite(conn, []byte("error"), []byte(err.Error()))
@@ -246,6 +250,40 @@ func ClickAction(file string, conn *websocket.Conn) {
 }
 
 //-------------------------
+func ServerDownFromRemote(requestid, sessionid int, sessionQuit chan bool, ma *Machine, l *lua.LState) int {
+        from := l.CheckString(1)
+        to := l.CheckString(2)
+        t := &pipe.FileCmd{requestid, from, []byte{}}
+	c:=make(chan responseT)
+	requestMgr.AddRequest(&requestT{id:requestid, m:ma,waitC:c, closeC:make(chan bool)})
+	defer requestMgr.RemoveRequest(requestid)
+	pipe.Send(ma.conn, pipe.DownloadFile, t)
+	for {
+		select {
+		case info:= <- c:
+                        if l.Get(3).Type() == lua.LTFunction {
+                                l.Push(l.Get(3))
+                                if info.head == "" {
+                                        er:=ioutil.WriteFile(to, []byte(info.msg), 0777)
+                                        if er != nil {
+                                                l.Push(lua.LString(er.Error()))
+                                        } else {
+                                                l.Push(lua.LString(""))
+                                        }
+                                } else {
+                                        l.Push(lua.LString(info.head))
+                                }
+                                if e := l.PCall(1, 0, nil); e !=nil { 
+                                        log.Println(e.Error())
+                                }
+                        }
+                        return 0
+                case <-sessionQuit:
+                        return 0
+		}
+	}
+        return 0
+}
 func ServerUploadToRemote(requestid, sessionid int, sessionQuit chan bool, ma *Machine, l *lua.LState) int {
         from := l.CheckString(1)
         to := l.CheckString(2)
@@ -271,7 +309,7 @@ func ServerUploadToRemote(requestid, sessionid int, sessionQuit chan bool, ma *M
                                         log.Println(e.Error())
                                 }
                         }
-                        return 1
+                        return 0
                 case <-sessionQuit:
                         return 0
 		}

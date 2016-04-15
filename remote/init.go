@@ -105,7 +105,10 @@ func Init() {
                                         var s pipe.FileCmd
 					pipe.DecodeBytes(info.Bytes, &s)
                                         go writeFile(s, info.Conn)
-
+                                case pipe.DownloadFile:
+                                        var s pipe.FileCmd
+					pipe.DecodeBytes(info.Bytes, &s)
+                                        go readFile(s, info.Conn)
                                 }
                         }
                 }
@@ -122,6 +125,17 @@ func Init() {
 	}
 }
 
+func readFile(s pipe.FileCmd, conn net.Conn) {
+        b, er := ioutil.ReadFile(s.Name)
+        var k *pipe.ResponseCmd
+        if er == nil {
+                k = &pipe.ResponseCmd{uint(s.Id), string(b), ""}
+        } else {
+                k = &pipe.ResponseCmd{uint(s.Id), "", er.Error()}
+        }
+
+        pipe.Send(conn, pipe.Response, k)
+}
 func writeFile(s pipe.FileCmd, conn net.Conn) {
         er:=ioutil.WriteFile(s.Name, s.Data, 0777)
         var k *pipe.ResponseCmd
@@ -130,56 +144,56 @@ func writeFile(s pipe.FileCmd, conn net.Conn) {
         } else {
                 k = &pipe.ResponseCmd{uint(s.Id), er.Error(), ""}
         }
-	pipe.Send(conn, pipe.Response, k)
+        pipe.Send(conn, pipe.Response, k)
 }
 
 func handleRequest(s pipe.RequestCmd, conn net.Conn) {
-	id := int(s.Id)
+        id := int(s.Id)
         session := g_SessionTbl.AddSession(id, s.SessionId)
 
-	l := lua.NewState()
-	l.OpenLibs()
+        l := lua.NewState()
+        l.OpenLibs()
         common.InitCommon(l, session.quitC)
-	if err := l.DoFile("logic_remote/internal/init.lua"); err != nil {
-		log.Println(err.Error())
-		return //todo
-	}
-	l.SetGlobal("MsgPack", l.Get(-1))
-	l.Pop(1)
-	common.RegLuaFunc(l, "SendBack", func(l *lua.LState) int {
-		return SendBack(int(id), l, conn, "recv")
-	})
-	common.RegLuaFunc(l, "SendBackEnd", func(l *lua.LState) int {
-		return SendBack(int(id), l, conn, "end")
-	})
-	str:=s.Cmd
-	if _err := l.DoFile("logic_remote/handle.lua"); _err != nil { 
-		log.Println(_err.Error())
-		return //todo
-	}
+        if err := l.DoFile("logic_remote/internal/init.lua"); err != nil {
+                log.Println(err.Error())
+                return //todo
+        }
+        l.SetGlobal("MsgPack", l.Get(-1))
+        l.Pop(1)
+        common.RegLuaFunc(l, "SendBack", func(l *lua.LState) int {
+                return SendBack(int(id), l, conn, "recv")
+        })
+        common.RegLuaFunc(l, "SendBackEnd", func(l *lua.LState) int {
+                return SendBack(int(id), l, conn, "end")
+        })
+        str:=s.Cmd
+        if _err := l.DoFile("logic_remote/handle.lua"); _err != nil { 
+                log.Println(_err.Error())
+                return //todo
+        }
         mp:=l.GetGlobal("MsgPack")
         l.Push(mp.(*lua.LTable).RawGetString("unpack"))
-	l.Push(lua.LString(str))
+        l.Push(lua.LString(str))
 
-	if e := l.PCall(1, 1, nil); e != nil {
-		log.Println(e.Error())
-	}
+        if e := l.PCall(1, 1, nil); e != nil {
+                log.Println(e.Error())
+        }
         t:=l.Get(-1)
         action := "handle_"  + string(t.(*lua.LTable).RawGetString("Action").(lua.LString))
         l.Push(l.GetGlobal(action))
-	l.Push(t)
-	if e := l.PCall(1, 0, nil); e != nil {
-		log.Println("call error", e.Error())
-	}
+        l.Push(t)
+        if e := l.PCall(1, 0, nil); e != nil {
+                log.Println("call error", e.Error())
+        }
         l.SetTop(0)
         l.Push(lua.LString(""))
-	SendBack(int(id), l, conn, "end")
+        SendBack(int(id), l, conn, "end")
         g_SessionTbl.DelSession(id)
 }
 
 func SendBack(requestid int, l *lua.LState, conn net.Conn, t string) int {
-	s := l.CheckString(1)
-	k := &pipe.ResponseCmd{uint(requestid), s, t}
-	pipe.Send(conn, pipe.Response, k)
-	return 0
+        s := l.CheckString(1)
+        k := &pipe.ResponseCmd{uint(requestid), s, t}
+        pipe.Send(conn, pipe.Response, k)
+        return 0
 }

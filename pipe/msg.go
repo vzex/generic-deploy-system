@@ -11,6 +11,7 @@ const (
 	RegRemote
         CancelRequest
         UploadFile
+        DownloadFile
 )
 
 type RemoteInfo struct {

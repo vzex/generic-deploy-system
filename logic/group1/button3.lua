@@ -9,6 +9,13 @@ ServerUploadToRemote("./server.go", "/tmp/a.go", function(er)
                 local_msg("upload ok")
         end
 end)
+ServerDownFromRemote("/tmp/a.go", "/tmp/b.go", function(er) 
+        if er ~= "" then
+                local_msg(er)
+        else
+                local_msg("download ok")
+        end
+end)
 --[[
 ServerUploadToRemote()
 LocalUploadToServer()
