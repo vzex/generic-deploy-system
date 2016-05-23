@@ -2,7 +2,7 @@ if bInit then
         return {multicontrol=true, name="upload"}
 end
 if not Single() then return end
-ServerUploadToRemote("./server.go", "/tmp/a.go", function(er) 
+--[[ServerUploadToRemote("./server.go", "/tmp/a.go", function(er) 
         if er ~= "" then
                 local_msg(er)
         else
@@ -15,7 +15,8 @@ ServerDownFromRemote("/tmp/a.go", "/tmp/b.go", function(er)
         else
                 local_msg("download ok")
         end
-end)
+end)]]
+LocalUploadToServer("test")
 --[[
 ServerUploadToRemote()
 LocalUploadToServer()

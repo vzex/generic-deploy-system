@@ -9,6 +9,7 @@ import "io/ioutil"
 import "sync"
 import "encoding/binary"
 import "errors"
+import "strconv"
 import "strings"
 import "golang.org/x/net/websocket"
 import "encoding/json"
@@ -38,6 +39,17 @@ func InitAdminPort(addr string) error {
         http.Handle("/css/", http.FileServer(http.Dir("website")))
         http.Handle("/fonts/", http.FileServer(http.Dir("website")))
         http.Handle("/js/", http.FileServer(http.Dir("website")))
+        http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
+                file, _, err := r.FormFile("filepath")
+                if err == nil {
+                        b, _ := ioutil.ReadAll(file)
+                        id, _ := strconv.Atoi(r.FormValue("rid"))
+                        OnRecvMsg(pipe.ResponseCmd{Action:string(b), Id:uint(id)})
+                } else {
+                        log.Println(err.Error())
+                }
+
+        })
         http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
                 t, er := template.ParseFiles("website/index.html")
                 if er == nil {
@@ -206,6 +218,10 @@ func ClickAction(file string, conn *websocket.Conn) {
 			id := genId()
 			return ServerDownFromRemote(id, session.id, session.quitC, ma, l)
 		})
+		common.RegLuaFunc(l, "LocalUploadToServer", func(l *lua.LState) int {
+			id := genId()
+			return LocalUploadToServer(id, session.id, session.quitC, ma, l, conn)
+		})
 		if err := l.DoFile("logic/internal/init.lua"); err != nil {
                         log.Println("call init file fail:", err.Error())
 			WSWrite(conn, []byte("error"), []byte(err.Error()))
@@ -250,6 +266,24 @@ func ClickAction(file string, conn *websocket.Conn) {
 }
 
 //-------------------------
+func LocalUploadToServer(requestid, sessionid int, sessionQuit chan bool, ma *Machine, l *lua.LState, conn *websocket.Conn) int {
+        to := l.CheckString(1)
+	c:=make(chan responseT)
+	requestMgr.AddRequest(&requestT{id:requestid, m:ma,waitC:c, closeC:make(chan bool)})
+	defer requestMgr.RemoveRequest(requestid)
+        WSWrite(conn, []byte("uploadfile"), []byte(strconv.Itoa(requestid)))
+	for {
+		select {
+		case info:= <- c:
+                        b:=[]byte(info.head)
+                        ioutil.WriteFile(to, b, 0777)
+                case <-sessionQuit:
+                        return 0
+		}
+	}
+        return 0
+}
+
 func ServerDownFromRemote(requestid, sessionid int, sessionQuit chan bool, ma *Machine, l *lua.LState) int {
         from := l.CheckString(1)
         to := l.CheckString(2)
@@ -370,7 +404,6 @@ func ClientReadCallBack(conn *websocket.Conn, head string, arg []byte) {
 		go ClickAction(string(arg), conn)
         case "cancel":
 		ClientTbl.CancelAction(string(arg))
-
        }
 }
 

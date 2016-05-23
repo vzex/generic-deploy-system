@@ -26,6 +26,7 @@
 	</div>
 </div>
 <script>
+var reader = new FileReader();  
 var socket;
 var recvData = new ArrayBuffer(0);
 function Decode(content) {
@@ -189,6 +190,9 @@ function clickbutton(name) {
                 ,backdrop: true
                 ,bgcolor: 'none'
                 ,okHide: function(){
+                if(reader.readyState == FileReader.LOADING) {
+                        reader.abort();
+                }
                 console.log(document.getElementById("btn"+name).dataset.session);
                 Send(socket, "cancel", document.getElementById("btn"+name).dataset.session)
                 }
@@ -257,31 +261,63 @@ function processMsg(head, msg) {
 			b.dataset.status="normal";
 			b.innerHTML=b.dataset.name;
                         break;
+                case "uploadfile":
+                        var requestid = msg;
+                                var body= "<form action=\"http://{{.}}/upload\" method=\"post\" enctype=\"multipart/form-data\" id=\"fo\">" +
+                                        "<label for=\"filepath\">File Path:</label>"+
+                                        "<input value=\""+requestid+"\" type=\"hidden\" name=\"rid\"></input>"+
+                                        "<input type=\"file\" name=\"filepath\" id=\"filepath\">"+
+                                        "<input type=\"submit\" name=\"submit\" value=\"Submit\"></form>"+
+                                        "<script>$(function() {"+
+                                        "$('.submit').click(function() {"+
+                                        "$('#registerform').submit();"+
+                                        "return false;"+
+                                        "console.log(\"wocao\");"+
+                                        "});"+
+                                        "});"
+                                        console.log(body);
+                        $.confirm({
+                                //body: "<input type=\"file\" id=\"fileload\">upload file</input>"
+                                body: body
+                                ,width: 'normal'
+                                ,backdrop: true
+                                ,bgcolor: 'none'
+                                ,okHide: function() {
+                                        var load = document.getElementById("fileload");
+                                        if (load.files.length == 0) {
+                                                return
+                                        }
+                                        reader.onload = function()  
+                                        {  
+                                        };  
+                                        reader.readAsBinaryString(load.files[0]); 
+                                }
+                        }) 
+                        break;
                 case "output":
-			var obj = jQuery.parseJSON(msg);
-			console.log(obj);
+                        var obj = jQuery.parseJSON(msg);
+                        console.log(obj);
 
-			switch(obj.Action) {
-				case "msg":
-					$.confirm({
-					body: obj.Msg
-					,width: 'normal'
-					,backdrop: true
-					,bgcolor: 'none'
-					/*,hide: function(){console.log('hide')}
-					,hidden: function(){console.log('hiden')}
-					,okHide: function(){var a=confirm('true or false');if(!a) return false}
-					,okHidden: function(){console.log('okHidden')}
-					,cancelHide: function(){console.log('cancelHide')}
-					,cancelHidden: function(){console.log('cancelHidden')}*/
-					})
-					break;
-			}
+                        switch(obj.Action) {
+                                case "msg": $.confirm({
+                                        body: obj.Msg
+                                        ,width: 'normal'
+                                        ,backdrop: true
+                                        ,bgcolor: 'none'
+                                        /*,hide: function(){console.log('hide')}
+                                        ,hidden: function(){console.log('hiden')}
+                                        ,okHide: function(){var a=confirm('true or false');if(!a) return false}
+                                        ,okHidden: function(){console.log('okHidden')}
+                                        ,cancelHide: function(){console.log('cancelHide')}
+                                        ,cancelHidden: function(){console.log('cancelHidden')}*/
+                                })
+                                break;
+                        }
 
                         break;
 
-                        }
-                        }
-                </script>
+                }
+        }
+</script>
         </body>
 </html>
