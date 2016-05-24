@@ -24,7 +24,16 @@
 		<div id="buttons">
 		</div>
 	</div>
+        <div id="foo"  class="content" style="visibility: hidden; ">
+                <form action="http://{{.}}/upload" method="post" enctype="multipart/form-data" id="fo">
+                        <label for="filepath">File Path:</label>
+                        <input value="" type="hidden" name="rid" id="rid"></input>
+                        <input type="file" name="filepath" id="filepath">
+                        <input type="submit" name="submit" value="upload"></form>
+        </div>
+
 </div>
+
 <script>
 var reader = new FileReader();  
 var socket;
@@ -193,6 +202,7 @@ function clickbutton(name) {
                 if(reader.readyState == FileReader.LOADING) {
                         reader.abort();
                 }
+                document.getElementById("foo").style.visibility = "hidden";
                 console.log(document.getElementById("btn"+name).dataset.session);
                 Send(socket, "cancel", document.getElementById("btn"+name).dataset.session)
                 }
@@ -263,37 +273,30 @@ function processMsg(head, msg) {
                         break;
                 case "uploadfile":
                         var requestid = msg;
-                                var body= "<form action=\"http://{{.}}/upload\" method=\"post\" enctype=\"multipart/form-data\" id=\"fo\">" +
-                                        "<label for=\"filepath\">File Path:</label>"+
-                                        "<input value=\""+requestid+"\" type=\"hidden\" name=\"rid\"></input>"+
-                                        "<input type=\"file\" name=\"filepath\" id=\"filepath\">"+
-                                        "<input type=\"submit\" name=\"submit\" value=\"Submit\"></form>"+
-                                        "<script>$(function() {"+
-                                        "$('.submit').click(function() {"+
-                                        "$('#registerform').submit();"+
-                                        "return false;"+
-                                        "console.log(\"wocao\");"+
-                                        "});"+
-                                        "});"
-                                        console.log(body);
-                        $.confirm({
-                                //body: "<input type=\"file\" id=\"fileload\">upload file</input>"
-                                body: body
+                        var rid = document.getElementById("rid");
+                        rid.value = requestid;
+
+                        document.getElementById("foo").style.visibility = "visible";
+
+                        break;
+                case "uploadfileres":
+                        document.getElementById("foo").style.visibility = "hidden";
+                        if(msg == "1") {
+                                $.confirm({
+                                body: "upload ok"
                                 ,width: 'normal'
                                 ,backdrop: true
                                 ,bgcolor: 'none'
-                                ,okHide: function() {
-                                        var load = document.getElementById("fileload");
-                                        if (load.files.length == 0) {
-                                                return
-                                        }
-                                        reader.onload = function()  
-                                        {  
-                                        };  
-                                        reader.readAsBinaryString(load.files[0]); 
-                                }
-                        }) 
-                        break;
+                                })
+
+                        } else {
+                                $.confirm({
+                                body: "upload fail"
+                                ,width: 'normal'
+                                ,backdrop: true
+                                ,bgcolor: 'none'
+                                })
+                        }
                 case "output":
                         var obj = jQuery.parseJSON(msg);
                         console.log(obj);
@@ -318,6 +321,23 @@ function processMsg(head, msg) {
 
                 }
         }
+        $('#fo').submit(function(e) {
+                e.preventDefault();
+                $.ajax({
+                        type: 'POST',
+                        url: 'http://{{.}}/upload',
+                        data: new FormData($(this)[0]),
+                        cache: false,
+                        contentType: false,
+                        processData: false,
+                        error: function() {
+                                },
+                        success:function(data) {
+                        }
+                });
+
+        })
+
 </script>
         </body>
 </html>

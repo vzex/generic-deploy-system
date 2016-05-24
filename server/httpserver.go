@@ -276,12 +276,23 @@ func LocalUploadToServer(requestid, sessionid int, sessionQuit chan bool, ma *Ma
 		select {
 		case info:= <- c:
                         b:=[]byte(info.head)
-                        ioutil.WriteFile(to, b, 0777)
+                        if er := ioutil.WriteFile(to, b, 0777); er == nil {
+                                l.Push(lua.LBool(true)) 
+                        } else {
+                                log.Println(er.Error())
+                                l.Push(lua.LBool(false))
+                        }
+                        WSWrite(conn, []byte("uploadfileres"), []byte("1"))
+                        return 1
                 case <-sessionQuit:
-                        return 0
+                        l.Push(lua.LBool(false))
+                        WSWrite(conn, []byte("uploadfileres"), []byte("0"))
+                        return 1
 		}
 	}
-        return 0
+        l.Push(lua.LBool(false))
+        WSWrite(conn, []byte("uploadfileres"), []byte("0"))
+        return 1
 }
 
 func ServerDownFromRemote(requestid, sessionid int, sessionQuit chan bool, ma *Machine, l *lua.LState) int {
