@@ -1,28 +1,22 @@
 if bInit then
-        return {multicontrol=true, name="upload"}
+        return {multicontrol=true, name="updown"}
 end
 if not Single() then return end
---[[ServerUploadToRemote("./server.go", "/tmp/a.go", function(er) 
-        if er ~= "" then
-                local_msg(er)
-        else
-                local_msg("upload ok")
-        end
-end)
-ServerDownFromRemote("/tmp/a.go", "/tmp/b.go", function(er) 
-        if er ~= "" then
-                local_msg(er)
-        else
-                local_msg("download ok")
-        end
-end)]]
-LocalUploadToServer("test")
---[[
-ServerUploadToRemote()
-LocalUploadToServer()
-RemoteDownToServer()
-ServerDownToLocal()
+local er = LocalUploadToServer("test")
+if er == nil then
+        local_msg("upload ok")
+else
+        local_msg("upload fail:"+er)
+end
 
+local er = LocalDownFromServer("test")
+if er == nil then
+        local_msg("down ok")
+else
+        local_msg("down fail:"..er)
+end
+
+--[[
 SendToSpecRemote()
 Connect(ip, port, function(recv, status)
 	print(recv)

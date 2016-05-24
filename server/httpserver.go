@@ -39,6 +39,26 @@ func InitAdminPort(addr string) error {
         http.Handle("/css/", http.FileServer(http.Dir("website")))
         http.Handle("/fonts/", http.FileServer(http.Dir("website")))
         http.Handle("/js/", http.FileServer(http.Dir("website")))
+        http.HandleFunc("/down", func(w http.ResponseWriter, r *http.Request) {
+                id, _ := strconv.Atoi(r.FormValue("id"))
+                defer func() {
+                        q:=requestMgr.GetRequest(int(id))
+                        if q == nil {
+                                return
+                        }
+                        select {
+                        case <-q.closeC:
+                        case q.waitC <- responseT{}:
+                        }
+                }()
+                q:=requestMgr.GetRequest(int(id))
+                if q == nil {
+                        return
+                }
+                w.Header().Set("Content-Disposition", "attachment; filename=\""+string(q.arg2)+"\"")
+                w.Header().Set("Content-Type", r.Header.Get("Content-Type"))
+                w.Write(q.arg)
+        })
         http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
                 file, _, err := r.FormFile("filepath")
                 if err == nil {
@@ -71,6 +91,8 @@ type requestT struct {
 	waitC chan responseT
 	closeC chan bool
 	id int
+        arg []byte
+        arg2 []byte
 }
 type requestMgrT struct {
 	tbl map[int]*requestT
@@ -222,6 +244,10 @@ func ClickAction(file string, conn *websocket.Conn) {
 			id := genId()
 			return LocalUploadToServer(id, session.id, session.quitC, ma, l, conn)
 		})
+		common.RegLuaFunc(l, "LocalDownFromServer", func(l *lua.LState) int {
+			id := genId()
+			return LocalDownFromServer(id, session.id, session.quitC, ma, l, conn)
+                })
 		if err := l.DoFile("logic/internal/init.lua"); err != nil {
                         log.Println("call init file fail:", err.Error())
 			WSWrite(conn, []byte("error"), []byte(err.Error()))
@@ -266,6 +292,29 @@ func ClickAction(file string, conn *websocket.Conn) {
 }
 
 //-------------------------
+func LocalDownFromServer(requestid, sessionid int, sessionQuit chan bool, ma *Machine, l *lua.LState, conn *websocket.Conn) int {
+        from := l.CheckString(1)
+	c:=make(chan responseT)
+        b, er := ioutil.ReadFile(from)
+        if er != nil {
+                l.Push(lua.LString(er.Error())) 
+                return 1
+        }
+        requestMgr.AddRequest(&requestT{id:requestid, m:ma,waitC:c, closeC:make(chan bool), arg : b, arg2:[]byte(from)})
+	defer requestMgr.RemoveRequest(requestid)
+        WSWrite(conn, []byte("downfile"), []byte(strconv.Itoa(requestid)))
+        log.Println("begin down", requestid)
+	for {
+		select {
+		case <- c:
+                        return 0
+                case <-sessionQuit:
+                        l.Push(lua.LString("quit"))
+                        return 1
+		}
+	}
+}
+
 func LocalUploadToServer(requestid, sessionid int, sessionQuit chan bool, ma *Machine, l *lua.LState, conn *websocket.Conn) int {
         to := l.CheckString(1)
 	c:=make(chan responseT)
@@ -277,22 +326,20 @@ func LocalUploadToServer(requestid, sessionid int, sessionQuit chan bool, ma *Ma
 		case info:= <- c:
                         b:=[]byte(info.head)
                         if er := ioutil.WriteFile(to, b, 0777); er == nil {
-                                l.Push(lua.LBool(true)) 
+                                WSWrite(conn, []byte("uploadfileres"), []byte("1"))
+                                return 0
                         } else {
+                                WSWrite(conn, []byte("uploadfileres"), []byte("0"))
                                 log.Println(er.Error())
-                                l.Push(lua.LBool(false))
+                                l.Push(lua.LString(er.Error())) 
+                                return 1
                         }
-                        WSWrite(conn, []byte("uploadfileres"), []byte("1"))
-                        return 1
                 case <-sessionQuit:
-                        l.Push(lua.LBool(false))
+                        l.Push(lua.LString("quit"))
                         WSWrite(conn, []byte("uploadfileres"), []byte("0"))
                         return 1
 		}
 	}
-        l.Push(lua.LBool(false))
-        WSWrite(conn, []byte("uploadfileres"), []byte("0"))
-        return 1
 }
 
 func ServerDownFromRemote(requestid, sessionid int, sessionQuit chan bool, ma *Machine, l *lua.LState) int {

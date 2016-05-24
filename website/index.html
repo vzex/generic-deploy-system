@@ -281,22 +281,11 @@ function processMsg(head, msg) {
                         break;
                 case "uploadfileres":
                         document.getElementById("foo").style.visibility = "hidden";
-                        if(msg == "1") {
-                                $.confirm({
-                                body: "upload ok"
-                                ,width: 'normal'
-                                ,backdrop: true
-                                ,bgcolor: 'none'
-                                })
-
-                        } else {
-                                $.confirm({
-                                body: "upload fail"
-                                ,width: 'normal'
-                                ,backdrop: true
-                                ,bgcolor: 'none'
-                                })
-                        }
+                        break;
+                case "downfile":
+                        var requestid = msg;
+                        window.open("http://{{.}}/down?id="+requestid)
+                        break;
                 case "output":
                         var obj = jQuery.parseJSON(msg);
                         console.log(obj);
