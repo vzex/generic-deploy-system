@@ -27,4 +27,5 @@ end
 local nick = tbl[math.random(1, #tbl)]
 print("choose nick", nick, "for remote call")
 local back = SendToNick(nick, "hidefunc", "extraarg")
+ScanButtons()
 print("test back", back)
