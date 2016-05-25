@@ -187,7 +187,7 @@ func split(data []byte, atEOF bool, conn *websocket.Conn, callback ReadCallBack)
         return offset, []byte{}, nil
 }
 
-func ClickAction(file string, conn *websocket.Conn) {
+func ClickAction(file string, conn *websocket.Conn, arg string, argid int) {
         client := ClientTbl.Get(conn)
         if client == nil {return}
 	ar := strings.Split(file, ":")
@@ -218,7 +218,33 @@ func ClickAction(file string, conn *websocket.Conn) {
 		l.SetGlobal("MachineGroup", lua.LString(group))
 		l.SetGlobal("MachineName", lua.LString(ma.Nick))
 		l.SetGlobal("MachineAddr", lua.LString(ma.conn.RemoteAddr().String()))
+		l.SetGlobal("ExtraArg", lua.LString(arg))
                 common.InitCommon(l, session.quitC)
+		common.RegLuaFunc(l, "GetNickList", func(l *lua.LState) int {
+                        t:=l.NewTable()
+                        for _, m := range ms.GetAll() {
+                                t.Append(lua.LString(m.Nick))
+                        }
+                        l.Push(t)
+                        return 1
+		})
+		common.RegLuaFunc(l, "SendToNick", func(l *lua.LState) int {
+                        c:=make(chan responseT)
+			id := genId()
+                        go ClickAction(_ar[0] + "/" + l.CheckString(2) + ":" + l.CheckString(1), conn, l.CheckString(3), id)
+                        requestMgr.AddRequest(&requestT{id:id, m:ma,waitC:c, closeC:make(chan bool)})
+                        defer requestMgr.RemoveRequest(id)
+                        for {
+                                select {
+                                case info:= <- c:
+                                        l.Push(lua.LString(info.msg))
+                                        return 1
+                                case <-session.quitC:
+                                        return 0
+                                }
+                        }
+                        return 0
+		})
 		common.RegLuaFunc(l, "SendToLocal", func(l *lua.LState) int {
                         s := l.CheckString(1)
 			WSWrite(conn, []byte("output"), []byte(s))
@@ -259,6 +285,21 @@ func ClickAction(file string, conn *websocket.Conn) {
                         log.Println("call logic file fail:", _err.Error())
 			WSWrite(conn, []byte("error"), []byte(_err.Error()))
 		}
+                if argid > 0 {
+                        backarg := l.Get(-1)
+                        if backarg.Type() == lua.LTString {
+                                go func() {
+                                        q:=requestMgr.GetRequest(int(argid))
+                                        if q == nil {
+                                                return
+                                        }
+                                        select {
+                                        case <-q.closeC:
+                                        case q.waitC <- responseT{"", backarg.String()}:
+                                        }
+                                }()
+                        }
+                }
 	}
 	if m == "all" {
 		t := ms.GetAll()
@@ -441,6 +482,8 @@ func SendToRemote(requestid, sessionid int, sessionQuit chan bool, ma *Machine, 
                         return 0
 		}
 	}
+        t.Stop()
+        return 0
 }
 //-------------------------
 func ClientReadCallBack(conn *websocket.Conn, head string, arg []byte) {
@@ -453,13 +496,19 @@ func ClientReadCallBack(conn *websocket.Conn, head string, arg []byte) {
 	       WSWrite(conn, []byte("grouplist"), b)
 	case "opengroup":
 		groupName := string(arg)
+                tbl := make(map[string]*buttonConfig)
 		buttons, h := LuaActionTbl[groupName]
 		if h {
-			b,_:=json.Marshal(buttons)
+                        for k, v := range buttons {
+                                if !v.Hide {
+                                        tbl[k] = v
+                                }
+                        }
+			b,_:=json.Marshal(tbl)
 			WSWrite(conn, []byte("buttonlist"), b)
 		}
 	case "click":
-		go ClickAction(string(arg), conn)
+		go ClickAction(string(arg), conn, "", 0)
         case "cancel":
 		ClientTbl.CancelAction(string(arg))
        }

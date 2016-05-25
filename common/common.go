@@ -2,6 +2,9 @@ package common
 
 import "github.com/yuin/gopher-lua"
 import "os/exec"
+import "net"
+import "bufio"
+import "time"
 import "strings"
 
 func RegLuaFunc(l *lua.LState, name string, f func(l *lua.LState) int) {
@@ -16,6 +19,61 @@ func RegLuaFuncWithCancel(l *lua.LState, name string, f func(l *lua.LState, sess
 func InitCommon(l *lua.LState, sessionQuitC chan bool) {
         RegLuaFuncWithCancel(l, "cmd", cmd, sessionQuitC)
         RegLuaFuncWithCancel(l, "bash", bash, sessionQuitC)
+        RegLuaFuncWithCancel(l, "connect", connect, sessionQuitC)
+}
+
+func connect(l *lua.LState, sessionQuitC chan bool) int {
+        addr := l.CheckString(1)
+        timeout := l.CheckInt(2)
+        conn, er := net.DialTimeout("tcp", addr, time.Duration(timeout)*time.Second)
+        if er != nil {
+                l.Push(lua.LString(er.Error()))
+                return 1
+        }
+        call := l.Get(3)
+        if call.Type() != lua.LTFunction {
+                return 0
+        }
+        f:=func(l *lua.LState) int {
+                s := l.CheckString(1)
+                switch s {
+                case "close":
+                        conn.Close()
+                        return 0
+                case "send":
+                        conn.Write([]byte(l.CheckString(2)))
+                }
+                return 0
+        }
+        newf:=l.NewFunction(f)
+        l.Push(newf)
+        l.Push(lua.LString("connected"))
+        if e := l.PCall(2, 0, nil); e != nil {
+                l.Push(lua.LString(e.Error()))
+                return 1
+        }
+        scanner := bufio.NewScanner(conn)
+        scanner.Split(func(data []byte, atEOF bool) (adv int, token []byte, err error) {
+                if len(data) <= 0 {
+                        return 0, nil, nil
+                }
+                l.Push(call)
+                l.Push(newf)
+                l.Push(lua.LString("recv"))
+                l.Push(lua.LString(data))
+                if e := l.PCall(3, 0, nil); e != nil {
+                        conn.Close()
+                        return 0, nil, e
+                }
+                return len(data), []byte{}, nil
+        })
+        for scanner.Scan() {
+        }
+        if scanner.Err() != nil {
+                l.Push(lua.LString(scanner.Err().Error()))
+                return 1
+        }
+        return 0
 }
 
 func cmd(l *lua.LState, sessionQuitC chan bool) int {

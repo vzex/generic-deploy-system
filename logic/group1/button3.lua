@@ -6,7 +6,7 @@ local er = LocalUploadToServer("test")
 if er == nil then
         local_msg("upload ok")
 else
-        local_msg("upload fail:"+er)
+        local_msg("upload fail:"..er)
 end
 
 local er = LocalDownFromServer("test")
@@ -18,8 +18,4 @@ end
 
 --[[
 SendToSpecRemote()
-Connect(ip, port, function(recv, status)
-	print(recv)
-end)
 ]]
---print("test over", endStr)

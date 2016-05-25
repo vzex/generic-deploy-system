@@ -10,4 +10,7 @@ end
 function local_msg(msg)
 	return SendToLocal(json.encode({Action="msg", Msg=msg}))
 end
+function remote_print(msg)
+	return SendToRemote(MsgPack.pack({Action="print", Cmd=msg}), timeout or 10, callback)
+end
 return m

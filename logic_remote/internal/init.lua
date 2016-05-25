@@ -9,4 +9,7 @@ function handle_bash(info)
         local s, ok = bash(commond)
         SendBack(MsgPack.pack({str=s, ok = ok}))
 end
+function handle_print(info)
+        print(info.Cmd)
+end
 return m
