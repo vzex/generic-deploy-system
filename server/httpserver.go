@@ -220,6 +220,10 @@ func ClickAction(file string, conn *websocket.Conn, arg string, argid int) {
 		l.SetGlobal("MachineAddr", lua.LString(ma.conn.RemoteAddr().String()))
 		l.SetGlobal("ExtraArg", lua.LString(arg))
                 common.InitCommon(l, session.quitC)
+		common.RegLuaFunc(l, "ScanButtons", func(l *lua.LState) int {
+			ScanButtons()
+                        return 0
+		})
 		common.RegLuaFunc(l, "GetNickList", func(l *lua.LState) int {
                         t:=l.NewTable()
                         for _, m := range ms.GetAll() {
@@ -497,7 +501,9 @@ func ClientReadCallBack(conn *websocket.Conn, head string, arg []byte) {
 	case "opengroup":
 		groupName := string(arg)
                 tbl := make(map[string]*buttonConfig)
+		LuaActionTblLock.RLock()
 		buttons, h := LuaActionTbl[groupName]
+		LuaActionTblLock.RUnlock()
 		if h {
                         for k, v := range buttons {
                                 if !v.Hide {

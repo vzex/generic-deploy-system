@@ -99,7 +99,6 @@ func Init() {
                                 case pipe.CancelRequest:
 					var s pipe.RequestCmd
 					pipe.DecodeBytes(info.Bytes, &s)
-                                        log.Println("CancelSession", s.SessionId)
 					go g_SessionTbl.CancelSession(s.SessionId)
                                 case pipe.UploadFile:
                                         var s pipe.FileCmd

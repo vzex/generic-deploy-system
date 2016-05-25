@@ -3,12 +3,12 @@ package server
 import "flag"
 import "log"
 import "net"
+import "sync"
 import "time"
 import "net/url"
 import "../pipe"
 import "os"
 import "golang.org/x/net/websocket"
-import "sync"
 import "github.com/yuin/gopher-lua"
 import "path/filepath"
 
@@ -239,6 +239,7 @@ type buttonConfig struct {
 	Hide bool
 }
 var LuaActionTbl map[string](map[string]*buttonConfig)
+var LuaActionTblLock sync.RWMutex
 func Init() {
 	ClientTbl = &ClientTblT{}
 	ClientTbl.tbl = make(map[*websocket.Conn]*ClientT)
@@ -264,6 +265,8 @@ func Init() {
 }
 
 func ScanButtons() {
+	LuaActionTblLock.Lock()
+	defer LuaActionTblLock.Unlock()
 	LuaActionTbl = make(map[string](map[string]*buttonConfig))
 	filepath.Walk("./logic", func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() {
