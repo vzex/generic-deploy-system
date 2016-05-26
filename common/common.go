@@ -3,6 +3,7 @@ package common
 import "github.com/yuin/gopher-lua"
 import "os/exec"
 import "net"
+import "encoding/base64"
 import "bufio"
 import "time"
 import "strings"
@@ -20,6 +21,15 @@ func InitCommon(l *lua.LState, sessionQuitC chan bool) {
         RegLuaFuncWithCancel(l, "cmd", cmd, sessionQuitC)
         RegLuaFuncWithCancel(l, "bash", bash, sessionQuitC)
         RegLuaFuncWithCancel(l, "connect", connect, sessionQuitC)
+        RegLuaFuncWithCancel(l, "base64", func(l *lua.LState, quit chan bool) int {
+                l.Push(lua.LString(base64.StdEncoding.EncodeToString([]byte(l.CheckString(1)))))
+                return 1
+        }, sessionQuitC)
+        RegLuaFuncWithCancel(l, "from64", func(l *lua.LState, quit chan bool) int {
+                s, _ := base64.StdEncoding.DecodeString(l.CheckString(1))
+                l.Push(lua.LString(s))
+                return 1
+        }, sessionQuitC)
 }
 
 func connect(l *lua.LState, sessionQuitC chan bool) int {
@@ -45,6 +55,15 @@ func connect(l *lua.LState, sessionQuitC chan bool) int {
                 }
                 return 0
         }
+        go func() {
+                for {
+                        select {
+                        case <- sessionQuitC:
+                                conn.Close()
+                                return
+                        }
+                }
+        }()
         newf:=l.NewFunction(f)
         l.Push(newf)
         l.Push(lua.LString("connected"))

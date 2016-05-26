@@ -72,8 +72,8 @@ function Decode(content) {
 	}
 	if (_content.byteLength == 0) return [];
 	var view = new Uint8Array(_content);
-	var l1 = view[0] + (view[1] >> 8);
-	var l2 = view[2] + (view[3] >> 8) + (view[4] >> 16) + (view[5] >> 24);
+        var l1 = view[0] + Math.pow(2, 8)*view[1];
+        var l2 = view[2] + Math.pow(2, 8)*view[3] + Math.pow(2, 16)*view[4] + Math.pow(2, 24)*view[5];
 	var l = l1 + l2 + 6;
 	//console.log(l1+"s"+l2);
 	if (_content.length < l) {
@@ -339,7 +339,7 @@ function processMsg(head, msg) {
 
                         switch(obj.Action) {
                                 case "dialog": $.confirm({
-                                        body: obj.Msg
+                                        body: atob(obj.Msg)
                                         ,width: 'normal'
                                         ,backdrop: true
                                         ,bgcolor: 'none'
@@ -352,7 +352,7 @@ function processMsg(head, msg) {
                                 })
                                 break;
                                 case "msg":
-                                        appendlog(obj.Msg);
+                                        appendlog(atob(obj.Msg));
                                 break;
                         }
 

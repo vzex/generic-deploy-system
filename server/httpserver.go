@@ -153,8 +153,8 @@ func WSWrite(conn *websocket.Conn, head, b []byte) {
         copy(c[6:6+len(head)], head)
         copy(c[6+len(head):], b)
         websocket.Message.Send(conn, c)
-        //a:=int(c[0])+int(c[1]>>8)
-        //g:=int(c[2])+int(c[3]>>8)+int(c[4]>>16)+int(c[5]>>24)
+    //    a:=int(c[0])+int(c[1]>>8)
+      //  g:=int(c[2])+int(c[3]>>8)+int(c[4]>>16)+int(c[5]>>24)
 
 
         //log.Println("write", len(c), a, g, len(head), len(b))
@@ -420,6 +420,7 @@ func ServerDownFromRemote(requestid, sessionid int, sessionQuit chan bool, ma *M
                                 l.Push(l.Get(3))
                                 if info.head == "" {
                                         er:=ioutil.WriteFile(to, []byte(info.msg), 0777)
+                                        log.Println("writefile", len(info.msg), to)
                                         if er != nil {
                                                 l.Push(lua.LString(er.Error()))
                                         } else {
