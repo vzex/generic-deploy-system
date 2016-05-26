@@ -1,4 +1,4 @@
-local m = require "logic/internal/pack"
+local m = require "logic_remote/internal/pack"
 function handle_cmd(info)
         local commond = info.Cmd
         local s, ok = cmd(commond)
