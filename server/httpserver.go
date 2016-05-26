@@ -274,6 +274,10 @@ func ClickAction(file string, conn *websocket.Conn, arg string, argid int) {
 			id := genId()
 			return LocalUploadToServer(id, session.id, session.quitC, ma, l, conn)
 		})
+		common.RegLuaFunc(l, "LocalGetInput", func(l *lua.LState) int {
+			id := genId()
+			return LocalGetInput(id, session.id, session.quitC, ma, l, conn)
+		})
 		common.RegLuaFunc(l, "LocalDownFromServer", func(l *lua.LState) int {
 			id := genId()
 			return LocalDownFromServer(id, session.id, session.quitC, ma, l, conn)
@@ -337,6 +341,21 @@ func ClickAction(file string, conn *websocket.Conn, arg string, argid int) {
 }
 
 //-------------------------
+func LocalGetInput(requestid, sessionid int, sessionQuit chan bool, ma *Machine, l *lua.LState, conn *websocket.Conn) int {
+	c:=make(chan responseT)
+        requestMgr.AddRequest(&requestT{id:requestid, m:ma,waitC:c, closeC:make(chan bool)})
+	defer requestMgr.RemoveRequest(requestid)
+        WSWrite(conn, []byte("input"), []byte(strconv.Itoa(requestid)))
+	for {
+		select {
+                case info := <- c:
+                        l.Push(lua.LString(info.head))
+                        return 1
+                case <-sessionQuit:
+                        return 0
+		}
+	}
+}
 func LocalDownFromServer(requestid, sessionid int, sessionQuit chan bool, ma *Machine, l *lua.LState, conn *websocket.Conn) int {
         from := l.CheckString(1)
 	c:=make(chan responseT)
@@ -348,7 +367,6 @@ func LocalDownFromServer(requestid, sessionid int, sessionQuit chan bool, ma *Ma
         requestMgr.AddRequest(&requestT{id:requestid, m:ma,waitC:c, closeC:make(chan bool), arg : b, arg2:[]byte(from)})
 	defer requestMgr.RemoveRequest(requestid)
         WSWrite(conn, []byte("downfile"), []byte(strconv.Itoa(requestid)))
-        log.Println("begin down", requestid)
 	for {
 		select {
 		case <- c:
@@ -517,6 +535,20 @@ func ClientReadCallBack(conn *websocket.Conn, head string, arg []byte) {
 		go ClickAction(string(arg), conn, "", 0)
         case "cancel":
 		ClientTbl.CancelAction(string(arg))
+        case "input":
+                ar := strings.SplitN(string(arg), ":", 2)
+                if len(ar) != 2 {
+                        return
+                }
+                id, _ := strconv.Atoi(ar[0])
+                q:=requestMgr.GetRequest(int(id))
+                if q == nil {
+                        return
+                }
+                select {
+                case <-q.closeC:
+                case q.waitC <- responseT{ar[1], ""}:
+                }
        }
 }
 

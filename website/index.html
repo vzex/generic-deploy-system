@@ -23,15 +23,29 @@
 		</ul></span></span>
 		<div id="buttons">
 		</div>
-	</div>
-        <div id="foo"  class="content" style="visibility: hidden; ">
-                <form action="http://{{.}}/upload" method="post" enctype="multipart/form-data" id="fo">
-                        <label for="filepath">File Path:</label>
-                        <input value="" type="hidden" name="rid" id="rid"></input>
-                        <input type="file" name="filepath" id="filepath">
-                        <input type="submit" name="submit" value="upload"></form>
-        </div>
+                <div id="foo"  style="visibility: hidden; ">
+                        <form action="http://{{.}}/upload" method="post" enctype="multipart/form-data" id="fo">
+                                <label for="filepath">File Path:</label>
+                                <input value="" type="hidden" name="rid" id="rid"></input>
+                                <input type="file" name="filepath" id="filepath">
+                                <input type="submit" name="submit" value="upload"></form>
+                </div>
 
+                <div>output:</div>
+                <textarea id="log" style="overflow: auto; width: 600px; height: 180px;
+                        font: 12px Verdana;
+                        color:#000;
+                        background-color:#FFF;
+                        border: 1px dotted #999;
+                        scrollbar-face-color: #CBDDF1;
+                        scrollbar-highlight-color: #547CBB;
+                        scrollbar-shadow-color: #547CBB;
+                        scrollbar-3dlight-color: #ffffff;
+                        scrollbar-arrow-color:  #547CBB;
+                        scrollbar-track-color: #FFFFFF;
+                        scrollbar-darkshadow-color: #FFFFFF;" readonly>
+                </textarea>
+	</div>
 </div>
 
 <script>
@@ -132,6 +146,19 @@ if (window["WebSocket"]) {
 } else {
 	$.alert("<div><b>Your browser does not support WebSockets.</b></div>");
 }  
+
+var logs = new Array();
+function appendlog(content) {
+        if(logs.length > 100) {
+                logs.shift();
+        }
+        var d = new Date();
+        logs.push(d.toLocaleString() +" " + content);
+        var l = document.getElementById("log")
+        l.value = logs.join("\n");
+        l.scrollTop = l.scrollHeight;
+}
+
 var groupList=new Object();
 var lastSel = "";
 function updateTree() {
@@ -262,14 +289,18 @@ function processMsg(head, msg) {
 			var obj = jQuery.parseJSON(msg);
 			console.log(obj);
                         var b = document.getElementById("btn"+obj[0]);
-			b.dataset.status="lock";
-			b.dataset.session=obj[1];
-			b.innerHTML="waiting";
+                        if(b) {
+                                b.dataset.status="lock";
+                                b.dataset.session=obj[1];
+                                b.innerHTML="waiting";
+                        }
                         break;
                 case "unlock":
                         var b = document.getElementById("btn"+msg);
-			b.dataset.status="normal";
-			b.innerHTML=b.dataset.name;
+                        if(b) {
+                                b.dataset.status="normal";
+                                b.innerHTML=b.dataset.name;
+                        }
                         break;
                 case "uploadfile":
                         var requestid = msg;
@@ -286,12 +317,28 @@ function processMsg(head, msg) {
                         var requestid = msg;
                         window.open("http://{{.}}/down?id="+requestid)
                         break;
+                case "input":
+                var requestid = msg;
+                $.confirm({
+                body: "please input:<input type=\"input\" id='getinput'></input>"
+                ,width: 'normal'
+                ,backdrop: true
+                ,bgcolor: 'none'
+                ,okHide: function(){
+                        var v = document.getElementById("getinput").value;
+                        Send(socket, "input", requestid+":"+v);
+                }
+                ,cancelHide: function(){
+                        Send(socket, "input", requestid+":");
+                }
+                })
+
                 case "output":
                         var obj = jQuery.parseJSON(msg);
                         console.log(obj);
 
                         switch(obj.Action) {
-                                case "msg": $.confirm({
+                                case "dialog": $.confirm({
                                         body: obj.Msg
                                         ,width: 'normal'
                                         ,backdrop: true
@@ -303,6 +350,9 @@ function processMsg(head, msg) {
                                         ,cancelHide: function(){console.log('cancelHide')}
                                         ,cancelHidden: function(){console.log('cancelHidden')}*/
                                 })
+                                break;
+                                case "msg":
+                                        appendlog(obj.Msg);
                                 break;
                         }
 

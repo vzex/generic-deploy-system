@@ -1,5 +1,5 @@
 if bInit then
-        return {multicontrol=true, name="updown"}
+        return {name="updown"}
 end
 if not Single() then return end
 local er = LocalUploadToServer("test")
